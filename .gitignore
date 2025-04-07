@@ -2,7 +2,10 @@
 *.tar.gz
 rootfs.*
 package.json
+control
 *.bin
+*.tar
+*.deb
 
 sys-utils/hex/hex
 sys-utils/ioctl-echo-loop/ioctl-echo-loop

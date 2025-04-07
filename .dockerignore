@@ -1,7 +1,13 @@
-machine-guest-tools-*.ext2
-rootfs*
+*.ext2
+*.tar.gz
+*.deb
+*.tar
+*.md
 .clang-format
 .github
+.gitignore
 .git
-*.md
 fs
+package.json
+control
+Dockerfile

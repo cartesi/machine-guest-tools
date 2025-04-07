@@ -21,6 +21,7 @@ LABEL :=
 VERSION := $(MAJOR).$(MINOR).$(PATCH)$(LABEL)
 
 TOOLS_TARGZ  := machine-guest-tools_riscv64.tar.gz
+TOOLS_DEB    := machine-guest-tools_riscv64.deb
 TOOLS_IMAGE  := cartesi/machine-guest-tools:$(VERSION)
 TOOLS_ROOTFS := rootfs-tools.ext2
 TOOLS_ROOTFS_IMAGE := cartesi/rootfs-tools:$(VERSION)
@@ -45,9 +46,10 @@ build-riscv64: sys-utils rollup-http package.json ## Build riscv64 tools
 
 build: targz fs ## Build targz and fs (cross compiling with Docker)
 
-targz: ## Build tools .tar.gz (cross compiling with Docker)
+targz deb: ## Build tools .tar.gz (cross compiling with Docker)
 	@docker buildx build --load \
 		--build-arg TOOLS_TARGZ=$(TOOLS_TARGZ) \
+		--build-arg TOOLS_DEB=$(TOOLS_DEB) \
 		--build-arg LINUX_HEADERS_URLPATH=$(LINUX_HEADERS_URLPATH) \
 		--build-arg LINUX_HEADERS_SHA256=$(LINUX_HEADERS_SHA256) \
 		-t $(TOOLS_IMAGE) \
@@ -58,7 +60,11 @@ targz: ## Build tools .tar.gz (cross compiling with Docker)
 copy:
 	@ID=`docker create $(TOOLS_IMAGE)` && \
 	   docker cp $$ID:/work/$(TOOLS_TARGZ) . && \
+	   docker cp $$ID:/work/$(TOOLS_DEB) . && \
 	   docker rm $$ID
+
+control: Makefile control.in
+	@sed 's|ARG_VERSION|$(VERSION)|g' control.in > control
 
 package.json: Makefile package.json.in
 	@sed 's|ARG_VERSION|$(VERSION)|g' package.json.in > package.json
@@ -68,11 +74,11 @@ fs: $(TOOLS_ROOTFS) ## Build tools rootfs image (cross compiling with Docker)
 $(TOOLS_ROOTFS): $(TOOLS_TARGZ) fs/Dockerfile
 	@docker buildx build --platform linux/riscv64 \
 	  --build-arg TOOLS_TARGZ=$(TOOLS_TARGZ) \
-	  --output type=tar,dest=rootfs.tar \
+	  --output type=tar,dest=rootfs-tools.tar \
 	  --file fs/Dockerfile \
 	  . && \
-	xgenext2fs -fzB 4096 -i 4096 -r +4096 -a rootfs.tar -L rootfs $(TOOLS_ROOTFS) && \
-	rm -f rootfs.tar
+	xgenext2fs -fzB 4096 -i 4096 -r +4096 -a rootfs-tools.tar -L rootfs $(TOOLS_ROOTFS) && \
+	rm -f rootfs-tools.tar
 
 fs-license: ## Build tools rootfs image HTML with license information
 	@docker buildx build --load --platform linux/riscv64 \
@@ -85,6 +91,7 @@ fs-license: ## Build tools rootfs image HTML with license information
 env: ## Print useful Makefile information
 	@echo VERSION=$(VERSION)
 	@echo TOOLS_TARGZ=$(TOOLS_TARGZ)
+	@echo TOOLS_DEB=$(TOOLS_DEB)
 	@echo TOOLS_ROOTFS=$(TOOLS_ROOTFS)
 	@echo TOOLS_IMAGE=$(TOOLS_IMAGE)
 	@echo TOOLS_ROOTFS_IMAGE=$(TOOLS_ROOTFS_IMAGE)
@@ -142,7 +149,7 @@ clean-image: ## Clean docker images
 	@(docker rmi $(TOOLS_IMAGE) > /dev/null 2>&1 || true)
 
 clean: ## Clean built files
-	@rm -f $(TOOLS_TARGZ) rootfs*.ext2
+	@rm -f $(TOOLS_TARGZ) $(TOOLS_DEB) $(TOOLS_ROOTFS) rootfs-tools.tar
 	@$(MAKE) -C sys-utils/libcmt clean
 	@$(MAKE) -C sys-utils clean
 	@$(MAKE) -C rollup-http clean

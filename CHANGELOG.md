@@ -22,9 +22,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Increased JsonConfig limit in `rollup-http-server`
 - Removed pinning of package versions from all Dockerfiles
 
-### Removed
-- Removed all Debian packaging from this repository build system
-
 ## [0.16.1] - 2024-08-12
 ### Fixed
 - Fixed curl version on rootfs

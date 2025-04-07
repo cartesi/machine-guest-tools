@@ -1,0 +1,7 @@
+#!/bin/sh
+set -e
+# Check if the dapp user already exists, otherwise add it
+if ! getent passwd dapp > /dev/null; then
+    useradd --create-home --user-group dapp
+fi
+exit 0
