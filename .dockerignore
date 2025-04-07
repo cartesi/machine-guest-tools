@@ -1,7 +1,0 @@
-machine-guest-tools-*.ext2
-rootfs*
-.clang-format
-.github
-.git
-*.md
-fs

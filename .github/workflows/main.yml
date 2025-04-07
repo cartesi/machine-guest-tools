@@ -52,7 +52,7 @@ jobs:
       - name: Buildx setup
         uses: docker/setup-buildx-action@v3
 
-      - name: Build [${{ env.TOOLS_TARGZ }}]
+      - name: Build [${{ env.TOOLS_TARGZ }}] and [${{ env.TOOLS_DEB }}]
         id: docker_build
         uses: docker/build-push-action@v5
         with:
@@ -63,6 +63,7 @@ jobs:
           load: true
           build-args: |
             TOOLS_TARGZ=${{ env.TOOLS_TARGZ }}
+            TOOLS_DEB=${{ env.TOOLS_DEB }}
             LINUX_HEADERS_URLPATH=${{ env.LINUX_HEADERS_URLPATH }}
             LINUX_HEADERS_SHA256=${{ env.LINUX_HEADERS_SHA256 }}
           cache-from: type=gha,scope=regular,mode=max
@@ -85,7 +86,7 @@ jobs:
           name: license
           if-no-files-found: error
           path: |
-            ${{ env.TOOLS_ROOTFS }}.html
+            ${{ env.TOOLS_ROOTFS_EXT2 }}.html
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -93,13 +94,14 @@ jobs:
           if-no-files-found: error
           path: |
             ${{ env.TOOLS_TARGZ }}
-            ${{ env.TOOLS_ROOTFS }}
+            ${{ env.TOOLS_ROOTFS_EXT2 }}
 
       - name: Checksum artifacts
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
           sha512sum ${{ env.TOOLS_TARGZ }} > ${{ env.TOOLS_TARGZ }}.sha512
-          sha512sum ${{ env.TOOLS_ROOTFS }} > ${{ env.TOOLS_ROOTFS }}.sha512
+          sha512sum ${{ env.TOOLS_DEB }} > ${{ env.TOOLS_DEB }}.sha512
+          sha512sum ${{ env.TOOLS_ROOTFS_EXT2 }} > ${{ env.TOOLS_ROOTFS_EXT2 }}.sha512
 
       - uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/v')
@@ -108,9 +110,11 @@ jobs:
           files: |
             ${{ env.TOOLS_TARGZ }}
             ${{ env.TOOLS_TARGZ }}.sha512
-            ${{ env.TOOLS_ROOTFS }}
-            ${{ env.TOOLS_ROOTFS }}.html
-            ${{ env.TOOLS_ROOTFS }}.sha512
+            ${{ env.TOOLS_DEB }}
+            ${{ env.TOOLS_DEB }}.sha512
+            ${{ env.TOOLS_ROOTFS_EXT2 }}
+            ${{ env.TOOLS_ROOTFS_EXT2 }}.html
+            ${{ env.TOOLS_ROOTFS_EXT2 }}.sha512
 
   test:
     runs-on: ubuntu-latest-8-cores

@@ -1,0 +1,13 @@
+*.ext2
+*.tar.gz
+*.deb
+*.tar
+*.md
+.clang-format
+.github
+.gitignore
+.git
+fs
+package.json
+control
+Dockerfile

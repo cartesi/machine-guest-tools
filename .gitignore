@@ -1,8 +1,11 @@
 *.ext2
 *.tar.gz
-rootfs.*
-package.json
 *.bin
+*.tar
+*.deb
+
+package.json
+control
 
 sys-utils/hex/hex
 sys-utils/ioctl-echo-loop/ioctl-echo-loop
