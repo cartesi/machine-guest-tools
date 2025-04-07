@@ -1,0 +1,9 @@
+Package: machine-guest-tools
+Version: ARG_VERSION
+Section: utils
+Priority: optional
+Architecture: riscv64
+Maintainer: Cartesi Machine Reference Unit
+Depends: busybox-static
+Multi-Arch: same
+Description: Cartesi Machine guest tools

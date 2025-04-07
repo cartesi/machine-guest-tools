@@ -58,9 +58,38 @@ FROM tools-env AS builder
 COPY . /work
 WORKDIR /work
 
+# Compile
 RUN make -j$(nproc) libcmt
 RUN make -j$(nproc) sys-utils
 RUN make -j$(nproc) rollup-http
+
+# Install locally
 RUN make install DESTDIR=$(pwd)/_install PREFIX=/usr
+
+# Strip
+RUN <<EOF
+set -e
+riscv64-linux-gnu-strip _install/usr/bin/rollup-http-server
+riscv64-linux-gnu-strip _install/usr/bin/echo-dapp
+riscv64-linux-gnu-strip _install/usr/bin/rollup
+riscv64-linux-gnu-strip _install/usr/bin/ioctl-echo-loop
+riscv64-linux-gnu-strip _install/usr/bin/yield
+riscv64-linux-gnu-strip _install/usr/bin/hex
+riscv64-linux-gnu-strip _install/usr/sbin/xhalt
+riscv64-linux-gnu-strip -S -x _install/usr/lib/*.so
+riscv64-linux-gnu-strip -S _install/usr/lib/*.a
+EOF
+
+# Compile .tar.gz
 ARG TOOLS_TARGZ=machine-guest-tools_riscv64.tar.gz
 RUN cd _install && tar -czf /work/${TOOLS_TARGZ} *
+
+# Compile .deb
+ARG TOOLS_DEB=machine-guest-tools_riscv64.deb
+RUN <<EOF
+set -e
+make control
+mkdir _install/DEBIAN
+cp control copyright postinst _install/DEBIAN/
+dpkg-deb -Zxz --root-owner-group --build _install ${TOOLS_DEB}
+EOF

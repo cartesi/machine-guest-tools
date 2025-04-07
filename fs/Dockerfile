@@ -1,7 +1,6 @@
-# Final image
 FROM ubuntu:24.04
-ARG TOOLS_TARGZ=machine-guest-tools_riscv64.tar.gz
-ADD ${TOOLS_TARGZ} /
+ARG TOOLS_DEB=machine-guest-tools_riscv64.deb
+ADD ${TOOLS_DEB} /tmp/
 RUN apt-get update && \
     apt-get upgrade -y --no-install-recommends && \
     useradd --create-home --user-group dapp && \
@@ -20,5 +19,6 @@ RUN apt-get update && \
         file \
         stress-ng \
         libatomic1 \
+        /tmp/machine-guest-tools_riscv64.deb \
     && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* /var/cache/* /tmp/${TOOLS_DEB}
