@@ -28,13 +28,14 @@ static void help(const char *progname) {
     fprintf(stderr,
         "Usage: %s [options]\n"
         "Where options are: \n"
-        "  --vouchers=<n>    replicate input in n vouchers (default: 0)\n"
-        "  --notices=<n>     replicate input in n notices (default: 0)\n"
-        "  --reports=<n>     replicate input in n reports (default: 1)\n"
-        "  --reject=<n>      reject the nth input (default: -1)\n"
-        "  --reject-inspects reject all inspects\n"
-        "  --exception=<n>   cause an exception on the nth input (default: -1)\n"
-        "  --verbose=<n>     display information of structures (default: 0)\n",
+        "  --vouchers=<n>               replicate input in n vouchers (default: 0)\n"
+        "  --delegate-call-vouchers=<n> replicate input in n delegate call vouchers (default: 0)\n"
+        "  --notices=<n>                replicate input in n notices (default: 0)\n"
+        "  --reports=<n>                replicate input in n reports (default: 1)\n"
+        "  --reject=<n>                 reject the nth input (default: -1)\n"
+        "  --reject-inspects            reject all inspects\n"
+        "  --exception=<n>              cause an exception on the nth input (default: -1)\n"
+        "  --verbose=<n>                display information of structures (default: 0)\n",
         progname);
 
     exit(1);
@@ -42,6 +43,7 @@ static void help(const char *progname) {
 
 struct parsed_args {
     unsigned voucher_count;
+    unsigned delegate_call_vouchers;
     unsigned notice_count;
     unsigned report_count;
     unsigned verbose;
@@ -74,6 +76,7 @@ static void parse_args(int argc, char *argv[], struct parsed_args *args) {
 
     for (i = 1; i < argc; i++) {
         if (!parse_number(argv[i], "--vouchers=%u%n", &args->voucher_count) &&
+            !parse_number(argv[i], "--delegate-call-vouchers=%u%n", &args->delegate_call_vouchers) &&
             !parse_number(argv[i], "--notices=%u%n", &args->notice_count) &&
             !parse_number(argv[i], "--reports=%u%n", &args->report_count) &&
             !parse_number(argv[i], "--verbose=%u%n", &args->verbose) &&
@@ -112,6 +115,15 @@ static int write_vouchers(cmt_rollup_t *me, unsigned count, cmt_abi_address_t *d
     return 0;
 }
 
+static int write_delegate_call_vouchers(cmt_rollup_t *me, unsigned count, cmt_abi_address_t *destination, cmt_abi_bytes_t *payload) {
+    for (unsigned i = 0; i < count; i++) {
+        int rc = cmt_rollup_emit_delegate_call_voucher(me, destination, payload, NULL);
+        if (rc)
+            return rc;
+    }
+    return 0;
+}
+
 static int write_reports(cmt_rollup_t *me, unsigned count, cmt_abi_bytes_t *payload) {
     for (unsigned i = 0; i < count; i++) {
         int rc = cmt_rollup_emit_report(me, payload);
@@ -129,6 +141,9 @@ static int handle_advance_state_request(cmt_rollup_t *me, struct parsed_args *ar
     *index = advance.index;
     fprintf(stderr, "advance with index %d\n", (int) advance.index);
     if (write_vouchers(me, args->voucher_count, &advance.msg_sender, &advance.payload) != 0) {
+        return -1;
+    }
+    if (write_delegate_call_vouchers(me, args->delegate_call_vouchers, &advance.msg_sender, &advance.payload) != 0) {
         return -1;
     }
     if (write_notices(me, args->notice_count, &advance.payload) != 0) {

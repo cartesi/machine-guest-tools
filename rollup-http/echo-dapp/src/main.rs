@@ -19,7 +19,7 @@ mod config;
 use crate::config::{Config, TestConfig};
 use rollup_http_client::rollup::{
     AdvanceRequest, Exception, InspectRequest, Notice, Report, RollupRequest, RollupRequestError,
-    RollupResponse, Voucher,
+    RollupResponse, Voucher, DelegateCallVoucher,
 };
 
 use getopts::Options;
@@ -50,6 +50,21 @@ pub async fn process_advance_request(
 
             // Send voucher to http dispatcher
             client::send_voucher(&config.rollup_http_server_address, voucher).await;
+        }
+    }
+    // Generate test echo delegate call vouchers
+    if config.test_config.delegate_call_vouchers > 0 {
+        log::debug!("generating {} echo delegate call vouchers", config.test_config.delegate_call_vouchers);
+        // Generate test vouchers
+        for _ in 0..config.test_config.delegate_call_vouchers {
+            let delegate_call_voucher_payload = request.payload.clone();
+            let delegate_call_voucher = DelegateCallVoucher {
+                destination: request.metadata.msg_sender.clone(),
+                payload: delegate_call_voucher_payload,
+            };
+
+            // Send voucher to http dispatcher
+            client::send_delegate_call_voucher(&config.rollup_http_server_address, delegate_call_voucher).await;
         }
     }
     // Generate test echo notices
@@ -124,6 +139,12 @@ async fn main() -> std::io::Result<()> {
     );
     opts.optopt(
         "",
+        "delegate-call-vouchers",
+        "Replicate input in n delegate call vouchers (default 0)",
+        "",
+    );
+    opts.optopt(
+        "",
         "notices",
         "Replicate input in n notices (default 0)",
         "",
@@ -171,6 +192,9 @@ async fn main() -> std::io::Result<()> {
     let vouchers = matches
         .opt_get_default("vouchers", 0)
         .expect("vouchers could not be parsed");
+    let delegate_call_vouchers = matches
+        .opt_get_default("delegate-call-vouchers", 0)
+        .expect("vouchers could not be parsed");
     let notices = matches
         .opt_get_default("notices", 0)
         .expect("notices could not be parsed");
@@ -188,6 +212,7 @@ async fn main() -> std::io::Result<()> {
     // Setup configuration
     let mut config = Config::new(TestConfig {
         vouchers,
+        delegate_call_vouchers,
         notices,
         reports,
         reject,

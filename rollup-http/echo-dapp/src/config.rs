@@ -17,6 +17,7 @@
 #[derive(Clone, Debug, PartialEq)]
 pub struct TestConfig {
     pub vouchers: u32,
+    pub delegate_call_vouchers: u32,
     pub reports: u32,
     pub notices: u32,
     pub reject: i32,
