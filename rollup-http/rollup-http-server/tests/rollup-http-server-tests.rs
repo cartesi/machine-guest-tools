@@ -243,7 +243,10 @@ fn check_voucher_or_fail(original_voucher: Voucher, output_filename: &str) {
     );
     assert_eq!(
         "0x".to_string() + &decoded_voucher[1].to_string(),
-        original_voucher.value,
+        original_voucher
+            .value
+            .clone()
+            .unwrap_or_else(|| { "0x0".to_string() }),
     );
     assert_eq!(
         "0x".to_string() + &decoded_voucher[2].to_string(),
@@ -260,13 +263,18 @@ async fn test_write_voucher(
     println!("Writing voucher");
     let test_voucher_01 = Voucher {
         destination: "0x1111111111111111111111111111111111111111".to_string(),
-        value: "0xdeadbeef".to_string(),
+        value: Some("0xdeadbeef".to_string()),
         payload: "0x".to_string() + &hex::encode("voucher test payload 01"),
     };
     let test_voucher_02 = Voucher {
         destination: "0x2222222222222222222222222222222222222222".to_string(),
-        value: "0xdeadbeef".to_string(),
+        value: Some("0xdeadbeef".to_string()),
         payload: "0x".to_string() + &hex::encode("voucher test payload 02"),
+    };
+    let test_voucher_no_value = Voucher {
+        destination: "0x3333333333333333333333333333333333333333".to_string(),
+        value: None,
+        payload: "0x".to_string() + &hex::encode("voucher test payload 03"),
     };
     rollup_http_client::client::send_voucher(&context.address, test_voucher_01.clone()).await;
 
@@ -276,10 +284,17 @@ async fn test_write_voucher(
     println!("Writing second voucher!");
 
     rollup_http_client::client::send_voucher(&context.address, test_voucher_02.clone()).await;
-    context.server_handle.stop(true).await;
 
     check_voucher_or_fail(test_voucher_02, "none.output-1.bin");
     std::fs::remove_file("none.output-1.bin")?;
+
+    println!("Writing voucher with no value!");
+
+    rollup_http_client::client::send_voucher(&context.address, test_voucher_no_value.clone()).await;
+    context.server_handle.stop(true).await;
+
+    check_voucher_or_fail(test_voucher_no_value, "none.output-2.bin");
+    std::fs::remove_file("none.output-2.bin")?;
 
     Ok(())
 }

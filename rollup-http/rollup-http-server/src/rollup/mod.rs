@@ -241,7 +241,7 @@ pub struct Voucher {
     #[validate(regex(path = "*ETH_ADDR_REGEXP"))]
     pub destination: String,
     #[validate(regex(path = "*ETH_U256_REGEXP"))]
-    pub value: String,
+    pub value: Option<String>,
     pub payload: String,
 }
 
@@ -449,7 +449,12 @@ pub fn rollup_write_voucher(
             ))));
         }
     };
-    let value = cmt_abi_u256_t::from_hex(&voucher.value[2..])?;
+
+    let value_hex = voucher
+        .value
+        .as_deref() // Option<&str>
+        .unwrap_or("0x0000000000000000000000000000000000000000000000000000000000000000");
+    let value = cmt_abi_u256_t::from_hex(&value_hex[2..])?;
     let address = cmt_abi_address_t::from_hex(&voucher.destination[2..])?;
     let payload = cmt_abi_bytes_t {
         data: binary_payload.as_mut_ptr() as *mut c_void,
