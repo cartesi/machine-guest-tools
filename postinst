@@ -2,6 +2,6 @@
 set -e
 # Check if the dapp user already exists, otherwise add it
 if ! getent passwd dapp > /dev/null; then
-    useradd --create-home --user-group dapp
+    useradd --create-home --user-group dapp && chage -d 0 dapp
 fi
 exit 0

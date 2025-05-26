@@ -3,7 +3,6 @@ ARG TOOLS_DEB=machine-guest-tools_riscv64.deb
 ADD ${TOOLS_DEB} /tmp/
 RUN apt-get update && \
     apt-get upgrade -y --no-install-recommends && \
-    useradd --create-home --user-group dapp && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         busybox-static \
         coreutils \
