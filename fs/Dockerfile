@@ -17,6 +17,7 @@ RUN apt-get update && \
         lua-socket \
         xxd \
         file \
+        strace \
         stress-ng \
         libatomic1 \
         /tmp/machine-guest-tools_riscv64.deb \
