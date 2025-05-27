@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.1] - 2025-05-27
+### Added
+- Added strace to guest-tools rootfs
+
+### Fixed
+- Fixed non-deterministic behavior when creating the dapp user
+
 ## [0.17.0] - 2025-04-25
 ### Added
 - Allow compiling inside riscv64 environment without cross compilation
@@ -193,7 +200,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [0.2.0]
 - [0.1.0]
 
-[Unreleased]: https://github.com/cartesi/machine-guest-tools/compare/v0.17.0...HEAD
+[Unreleased]: https://github.com/cartesi/machine-guest-tools/compare/v0.17.1...HEAD
+[0.17.1]: https://github.com/cartesi/machine-guest-tools/releases/tag/v0.17.1
 [0.17.0]: https://github.com/cartesi/machine-guest-tools/releases/tag/v0.17.0
 [0.16.1]: https://github.com/cartesi/machine-guest-tools/releases/tag/v0.16.1
 [0.16.0]: https://github.com/cartesi/machine-guest-tools/releases/tag/v0.16.0
