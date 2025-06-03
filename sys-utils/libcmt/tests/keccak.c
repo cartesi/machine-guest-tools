@@ -59,6 +59,6 @@ int main(void) {
     test_cmt_keccak_init();
     test_cmt_keccak_hash_operations();
     test_cmt_keccak_funsel();
-    printf("All keccak tests passed!\n");
+    printf("All keccak tests passed\n");
     return 0;
 }

@@ -32,6 +32,6 @@ int main(void) {
     assert(memcmp(req.response_data, reply, req.response_data_length) == 0);
 
     cmt_rollup_fini(&rollup);
-    printf("test_gio_request passed!\n");
+    printf("%s passed\n", __FUNCTION__);
     return 0;
 }

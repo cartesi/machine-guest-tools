@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
-int main(void) {
+void test_rollup_progress(void) {
     cmt_rollup_t rollup;
 
     assert(cmt_rollup_init(&rollup) == 0);
@@ -14,6 +14,10 @@ int main(void) {
     assert(cmt_rollup_progress(&rollup, UINT32_MAX) == 0);
     cmt_rollup_fini(&rollup);
 
-    printf("test_rollup_progress passed!\n");
+    printf("%s passed\n", __FUNCTION__);
+}
+
+int main(void) {
+    test_rollup_progress();
     return 0;
 }
