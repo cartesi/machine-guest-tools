@@ -214,7 +214,25 @@ void test_rollup_outputs_reports_and_exceptions(void) {
     assert(index == 2);
 
     cmt_rollup_fini(&rollup);
-    printf("test_rollup_outputs_reports_and_exceptions passed!\n");
+    printf("test_rollup_outputs_reports_and_exceptions passed\n");
+}
+
+void test_rollup_root_hash_pristine(void) {
+    cmt_rollup_t rollup;
+    cmt_rollup_finish_t finish;
+
+    assert(cmt_rollup_init(&rollup) == 0);
+    assert(cmt_rollup_finish(&rollup, &finish) == 0);
+    cmt_rollup_fini(&rollup);
+
+    uint8_t expected_root[CMT_KECCAK_LENGTH] = {0x0a, 0x16, 0x29, 0x46, 0xe5, 0x61, 0x58, 0xba, 0xc0, 0x67, 0x3e, 0x6d,
+        0xd3, 0xbd, 0xfd, 0xc1, 0xe4, 0xa0, 0xe7, 0x74, 0x4a, 0x12, 0x0f, 0xdb, 0x64, 0x00, 0x50, 0xc8, 0xd7, 0xab,
+        0xe1, 0xc6};
+
+    for (int i = 0; i < CMT_KECCAK_LENGTH; ++i) {
+        assert(cmt_io_get_tx(rollup.io).begin[i] == expected_root[i]);
+    }
+    printf("test_rollup_root_hash_pristine passed\n");
 }
 
 int main(void) {
