@@ -39,6 +39,10 @@ typedef struct cmt_rollup {
     union cmt_io_driver io[1];
     uint32_t fromhost_data;
     cmt_merkle_t merkle[1];
+
+    // cache merkle values and repeat them on finish when the tree doesn't change
+    uint8_t finish_root_hash[CMT_KECCAK_LENGTH];
+    uint64_t finish_leaf_count;
 } cmt_rollup_t;
 
 /** Public struct with the advance state contents */

@@ -54,6 +54,23 @@ void test_merkle_init_and_reset(void) {
     printf("test_merkle_init_and_reset passed\n");
 }
 
+void test_merkle_get_root_pristine(void) {
+    cmt_merkle_t merkle;
+    cmt_merkle_init(&merkle);
+    assert(cmt_merkle_get_leaf_count(&merkle) == 0);
+
+    uint8_t root[CMT_KECCAK_LENGTH];
+    cmt_merkle_get_root_hash(&merkle, root);
+    uint8_t expected_root[CMT_KECCAK_LENGTH] = {0x0a, 0x16, 0x29, 0x46, 0xe5, 0x61, 0x58, 0xba, 0xc0, 0x67, 0x3e, 0x6d,
+        0xd3, 0xbd, 0xfd, 0xc1, 0xe4, 0xa0, 0xe7, 0x74, 0x4a, 0x12, 0x0f, 0xdb, 0x64, 0x00, 0x50, 0xc8, 0xd7, 0xab,
+        0xe1, 0xc6};
+
+    for (int i = 0; i < CMT_KECCAK_LENGTH; ++i) {
+        assert(root[i] == expected_root[i]);
+    }
+    printf("test_merkle_get_root_pristine passed\n");
+}
+
 void test_merkle_push_back_and_get_root(void) {
     cmt_merkle_t merkle;
     cmt_merkle_init(&merkle);

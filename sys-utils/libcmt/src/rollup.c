@@ -57,6 +57,9 @@ int cmt_rollup_init(cmt_rollup_t *me) {
     }
 
     cmt_merkle_init(me->merkle);
+    me->finish_leaf_count = UINT64_C(-1);
+    me->fromhost_data = 0;
+    memset(me->finish_root_hash, 0, sizeof(me->finish_root_hash));
     return 0;
 }
 
@@ -367,7 +370,11 @@ int cmt_rollup_finish(cmt_rollup_t *me, cmt_rollup_finish_t *finish) {
         return revert(me->io); /* revert should not return! */
     }
 
-    cmt_merkle_get_root_hash(me->merkle, cmt_io_get_tx(me->io).begin);
+    uint64_t leaf_count = cmt_merkle_get_leaf_count(me->merkle);
+    if (me->finish_leaf_count != leaf_count) {
+        cmt_merkle_get_root_hash(me->merkle, me->finish_root_hash);
+    }
+    memcpy(cmt_io_get_tx(me->io).begin, me->finish_root_hash, CMT_ABI_U256_LENGTH);
     me->fromhost_data = CMT_ABI_U256_LENGTH;
     int reason = accepted(me->io, &me->fromhost_data);
     if (reason < 0) {
@@ -375,6 +382,7 @@ int cmt_rollup_finish(cmt_rollup_t *me, cmt_rollup_finish_t *finish) {
     }
     finish->next_request_type = reason;
     finish->next_request_payload_length = me->fromhost_data;
+    me->finish_leaf_count = leaf_count;
     return 0;
 }
 
