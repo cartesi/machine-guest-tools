@@ -51,7 +51,7 @@ void test_merkle_init_and_reset(void) {
             assert(merkle.state[i][j] == 0);
         }
     }
-    printf("test_merkle_init_and_reset passed\n");
+    printf("%s passed\n", __FUNCTION__);
 }
 
 void test_merkle_get_root_pristine(void) {
@@ -68,7 +68,7 @@ void test_merkle_get_root_pristine(void) {
     for (int i = 0; i < CMT_KECCAK_LENGTH; ++i) {
         assert(root[i] == expected_root[i]);
     }
-    printf("test_merkle_get_root_pristine passed\n");
+    printf("%s passed\n", __FUNCTION__);
 }
 
 void test_merkle_push_back_and_get_root(void) {
@@ -86,7 +86,7 @@ void test_merkle_push_back_and_get_root(void) {
     for (int i = 0; i < CMT_KECCAK_LENGTH; ++i) {
         assert(root[i] == expected_root[i]);
     }
-    printf("test_merkle_push_back_and_get_root passed\n");
+    printf("%s passed\n", __FUNCTION__);
 }
 
 void test_cmt_merkle_push_back_data_and_get_root(void) {
@@ -109,7 +109,7 @@ void test_cmt_merkle_push_back_data_and_get_root(void) {
         assert(root[i] == expected_root[i]);
     }
 
-    printf("test_merkle_push_back_data_and_get_root passed\n");
+    printf("%s passed\n", __FUNCTION__);
 }
 
 void test_cmt_merkle_push_back(void) {
@@ -124,7 +124,7 @@ void test_cmt_merkle_push_back(void) {
     assert(cmt_merkle_push_back(&merkle, hash2) == 0);
     assert(cmt_merkle_get_leaf_count(&merkle) == 2);
 
-    printf("test_merkle_push_back passed\n");
+    printf("%s passed\n", __FUNCTION__);
 }
 
 void test_cmt_merkle_push_back_data(void) {
@@ -139,7 +139,7 @@ void test_cmt_merkle_push_back_data(void) {
     assert(cmt_merkle_push_back_data(&merkle, strlen(data2), data2) == 0);
     assert(cmt_merkle_get_leaf_count(&merkle) == 2);
 
-    printf("test_merkle_push_back_data passed\n");
+    printf("%s passed\n", __FUNCTION__);
 }
 
 void test_cmt_merkle_save_load(void) {
@@ -180,7 +180,7 @@ void test_cmt_merkle_save_load(void) {
     assert(cmt_merkle_save(NULL, valid) == -EINVAL);
     assert(cmt_merkle_load(NULL, valid) == -EINVAL);
 
-    printf("test_cmt_merkle_save_load passed\n");
+    printf("%s passed\n", __FUNCTION__);
 }
 
 void test_cmt_merkle_full(void) {

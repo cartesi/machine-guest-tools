@@ -68,7 +68,7 @@ static void split_in_bounds_must_succeed(void) {
 
         assert(tmp.begin == b.end);
     }
-    printf("test_buf_split_in_bounds_must_succeed passed\n");
+    printf("%s passed\n", __FUNCTION__);
 }
 
 static void split_out_of_bounds_must_fail(void) {
@@ -80,7 +80,7 @@ static void split_out_of_bounds_must_fail(void) {
 
     assert(cmt_buf_split(&b, 9, &lhs, &rhs) == -ENOBUFS);
     assert(cmt_buf_split(&b, SIZE_MAX, &lhs, &rhs) == -ENOBUFS);
-    printf("test_buf_split_out_of_bounds_must_fail passed\n");
+    printf("%s passed\n", __FUNCTION__);
 }
 
 static void split_invalid_parameters(void) {

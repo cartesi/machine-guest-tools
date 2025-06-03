@@ -42,7 +42,7 @@ void test_rollup_init_and_fini(void) {
     assert(cmt_rollup_init(NULL) == -EINVAL);
     cmt_rollup_fini(NULL);
 
-    printf("test_rollup_init_and_fini passed!\n");
+    printf("%s passed\n", __FUNCTION__);
 }
 
 static void check_first_input(cmt_rollup_t *rollup) {
@@ -120,7 +120,7 @@ void test_rollup_parse_inputs(void) {
     assert(cmt_rollup_finish(&rollup, &finish) == -ENOSYS);
 
     cmt_rollup_fini(&rollup);
-    printf("test_rollup_parse_inputs passed!\n");
+    printf("%s passed\n", __FUNCTION__);
 }
 
 void test_rollup_outputs_reports_and_exceptions(void) {
@@ -214,7 +214,7 @@ void test_rollup_outputs_reports_and_exceptions(void) {
     assert(index == 2);
 
     cmt_rollup_fini(&rollup);
-    printf("test_rollup_outputs_reports_and_exceptions passed\n");
+    printf("%s passed\n", __FUNCTION__);
 }
 
 void test_rollup_root_hash_pristine(void) {
@@ -232,7 +232,7 @@ void test_rollup_root_hash_pristine(void) {
     for (int i = 0; i < CMT_KECCAK_LENGTH; ++i) {
         assert(cmt_io_get_tx(rollup.io).begin[i] == expected_root[i]);
     }
-    printf("test_rollup_root_hash_pristine passed\n");
+    printf("%s passed\n", __FUNCTION__);
 }
 
 int main(void) {
