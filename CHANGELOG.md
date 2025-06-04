@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.2] - 2025-06-04
+### Changed
+- Improved advances performance by caching the outputs Merkle hash when no new outputs are added
+
 ## [0.17.1] - 2025-05-27
 ### Added
 - Added strace to guest-tools rootfs
@@ -200,7 +204,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [0.2.0]
 - [0.1.0]
 
-[Unreleased]: https://github.com/cartesi/machine-guest-tools/compare/v0.17.1...HEAD
+[Unreleased]: https://github.com/cartesi/machine-guest-tools/compare/v0.17.2...HEAD
+[0.17.2]: https://github.com/cartesi/machine-guest-tools/releases/tag/v0.17.2
 [0.17.1]: https://github.com/cartesi/machine-guest-tools/releases/tag/v0.17.1
 [0.17.0]: https://github.com/cartesi/machine-guest-tools/releases/tag/v0.17.0
 [0.16.1]: https://github.com/cartesi/machine-guest-tools/releases/tag/v0.16.1
