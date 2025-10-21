@@ -136,7 +136,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y wait-for-it python3 python3-pip
-          pip3 install schemathesis
+          pip3 install schemathesis==3.39.16
           cd rollup-http/rollup-http-server
           wget https://raw.githubusercontent.com/cartesi/openapi-interfaces/v0.10.0/rollup.yaml
           MOCK_BUILD=true cargo run -- "echo 1" &
