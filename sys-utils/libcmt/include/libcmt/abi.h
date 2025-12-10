@@ -442,17 +442,6 @@ int cmt_abi_get_bool(cmt_buf_t *me, bool *value);
  * |-ENOBUFS| no space left in @p me | */
 int cmt_abi_get_address(cmt_buf_t *me, cmt_abi_address_t *value);
 
-/** Create a frame of reference for the dynamic section
- *
- * @param [in,out] me    initialized buffer
- * @param [out]    frame used when encoding dynamic values
- * @return
- * |        |                        |
- * |-------:|------------------------|
- * |       0| success                |
- * |-ENOBUFS| no space left in @p me | */
-int cmt_abi_start_frame(cmt_buf_t *me, void *frame);
-
 /** Consume and decode the offset @p of
  *
  * @param [in,out] me initialized buffer
