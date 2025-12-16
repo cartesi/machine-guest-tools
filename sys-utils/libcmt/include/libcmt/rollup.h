@@ -63,7 +63,7 @@ typedef struct cmt_rollup_inspect {
 } cmt_rollup_inspect_t;
 
 /** Public struct with the finish state contents */
-typedef struct cmt_rollup_finish {
+typedef struct cmt_rollup_finish_s {
     bool accept_previous_request;
     int next_request_type;
     uint32_t next_request_payload_length;
