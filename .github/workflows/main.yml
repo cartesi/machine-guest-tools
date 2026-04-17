@@ -11,7 +11,15 @@ jobs:
           sudo apt-get install -y --no-install-recommends build-essential autoconf automake libarchive-dev libarchive-tools pandoc
 
       # Building from source cause the provided debian package is for Debian Bookworm
+      - name: Cache xgenext2fs binary
+        id: cache-xgenext2fs
+        uses: actions/cache@v4
+        with:
+          path: /usr/local/bin/xgenext2fs
+          key: xgenext2fs-v1.5.6-${{ runner.os }}
+
       - name: Download, build and install xgenext2fs
+        if: steps.cache-xgenext2fs.outputs.cache-hit != 'true'
         run: |
           wget https://github.com/cartesi/genext2fs/archive/refs/tags/v1.5.6.tar.gz
           echo "34bfc26a037def23b85b676912462a3d126a87ef15c66c212b3500650da44f9e  v1.5.6.tar.gz" | sha256sum -c -
@@ -66,8 +74,8 @@ jobs:
             TOOLS_DEB=${{ env.TOOLS_DEB }}
             LINUX_HEADERS_URLPATH=${{ env.LINUX_HEADERS_URLPATH }}
             LINUX_HEADERS_SHA256=${{ env.LINUX_HEADERS_SHA256 }}
-          cache-from: type=gha,scope=regular,mode=max
-          cache-to: type=gha,scope=regular
+          cache-from: type=registry,ref=ghcr.io/cartesi/machine-guest-tools:buildcache
+          cache-to: type=registry,ref=ghcr.io/cartesi/machine-guest-tools:buildcache,mode=max,image-manifest=true,oci-mediatypes=true
 
       - name: Retrieve artifacts
         run: make copy
