@@ -15,9 +15,9 @@
 #
 
 MAJOR := 0
-MINOR := 17
-PATCH := 2
-LABEL :=
+MINOR := 18
+PATCH := 0
+LABEL := test-1
 VERSION := $(MAJOR).$(MINOR).$(PATCH)$(LABEL)
 
 TOOLS_TARGZ := machine-guest-tools_riscv64.tar.gz
@@ -27,10 +27,11 @@ TOOLS_ROOTFS_TAR := rootfs-tools.tar
 TOOLS_ROOTFS_EXT2 := rootfs-tools.ext2
 TOOLS_ROOTFS_IMAGE := cartesi/rootfs-tools:$(VERSION)
 
-LINUX_IMAGE_VERSION ?= v0.20.0
-LINUX_VERSION ?= 6.5.13-ctsi-1
-LINUX_HEADERS_URLPATH := https://github.com/cartesi/machine-linux-image/releases/download/${LINUX_IMAGE_VERSION}/linux-libc-dev-riscv64-cross-${LINUX_VERSION}-${LINUX_IMAGE_VERSION}.deb
-LINUX_HEADERS_SHA256 := 2723435e8b45d8fb7a79e9344f6dc517b3dbc08e03ac17baab311300ec475c08
+LINUX_IMAGE_TAG ?= v0.21.0-test1
+LINUX_IMAGE_VERSION ?= v0.21.0
+LINUX_VERSION ?= 6.5.13-ctsi-2-uio-test1
+LINUX_HEADERS_URLPATH := https://github.com/cartesi/machine-linux-image/releases/download/${LINUX_IMAGE_TAG}/linux-libc-dev-riscv64-cross-${LINUX_VERSION}-${LINUX_IMAGE_VERSION}.deb
+LINUX_HEADERS_SHA256 := 879ed9f8d88b248fde1dd4715f4060cef888720df14d829f8d64d81bdf71a35d
 
 PREFIX ?= /usr
 DESTDIR ?= .
@@ -96,6 +97,7 @@ env: ## Print useful Makefile information
 	@echo TOOLS_ROOTFS_EXT2=$(TOOLS_ROOTFS_EXT2)
 	@echo TOOLS_IMAGE=$(TOOLS_IMAGE)
 	@echo TOOLS_ROOTFS_IMAGE=$(TOOLS_ROOTFS_IMAGE)
+	@echo LINUX_IMAGE_TAG=$(LINUX_IMAGE_TAG)
 	@echo LINUX_IMAGE_VERSION=$(LINUX_IMAGE_VERSION)
 	@echo LINUX_VERSION=$(LINUX_VERSION)
 	@echo LINUX_HEADERS_URLPATH=$(LINUX_HEADERS_URLPATH)
