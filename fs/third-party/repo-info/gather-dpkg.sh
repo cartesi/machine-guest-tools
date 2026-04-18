@@ -29,6 +29,12 @@ if [ "${#packages[@]}" -eq 0 ]; then
 	exit 1
 fi
 
+if [ -z "${DPKG_ARCH:-}" ]; then
+	echo >&2 "error: DPKG_ARCH is not set"
+	exit 1
+fi
+apt_arch_opt=(-o "APT::Architecture=$DPKG_ARCH" -o "APT::Architectures=$DPKG_ARCH")
+
 if [ -e /etc/apt/sources.list ] || [ -d /etc/apt/sources.list.d ]; then
 	# make sure we have "deb-src" entries for "apt-get source"
 	find /etc/apt/sources.list* \
@@ -40,7 +46,7 @@ if [ -e /etc/apt/sources.list ] || [ -d /etc/apt/sources.list.d ]; then
 
 	# retry a few times if "apt-get update" fails
 	tries=5
-	while ! apt-get update -qq; do
+	while ! apt-get "${apt_arch_opt[@]}" update -qq; do
 		(( --tries )) || :
 		if [ "$tries" -le 0 ]; then
 			echo >&2 'error: failed to "apt-get update" after multiple attempts'
@@ -131,7 +137,7 @@ for src in "${sortedSources[@]}"; do
 	sourcesUrl="https://sources.debian.net/src/${src//=//}/"
 	snapshotUrl="http://snapshot.debian.org/package/${src//=//}/"
 
-	aptSourceArgs=( apt-get source -qq --print-uris "$src" )
+	aptSourceArgs=( apt-get "${apt_arch_opt[@]}" source -qq --print-uris "$src" )
 	if aptSource="$("${aptSourceArgs[@]}" 2>/dev/null)" && [ -n "$aptSource" ]; then
 		echo
 		echo 'Source:'

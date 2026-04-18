@@ -6,8 +6,9 @@ trap 'echo >&2 Ctrl+C captured, exiting; exit 1' SIGINT
 
 image="$1"; shift
 platform="$1"; shift
+arch="${platform##*/}"
 
-docker buildx build --platform $platform --load --pull -t repo-info:local-dpkg -f Dockerfile.local-dpkg . 1>&2
+docker buildx build --load --pull -t repo-info:local-dpkg -f Dockerfile.local-dpkg . 1>&2
 
 name="repo-info-local-$$-$RANDOM"
 trap "docker rm -vf '$name-data' > /dev/null || :" EXIT
@@ -27,7 +28,7 @@ docker create \
 echo '# `'"$image"'`'
 
 size="$(
-	docker inspect -f '{{ .VirtualSize }}' "$image" | awk '{
+	docker inspect -f '{{ .Size }}' "$image" 2>/dev/null | awk '{
 		oneKb = 1000;
 		oneMb = 1000 * oneKb;
 		oneGb = 1000 * oneMb;
@@ -54,6 +55,6 @@ docker inspect -f '
 {{ if .Config.Entrypoint }}- Entrypoint: `{{ json .Config.Entrypoint }}`
 {{ end }}{{ if .Config.Cmd }}- Command: `{{ json .Config.Cmd }}`
 {{ end }}- Environment:{{ range .Config.Env }}{{ "\n" }}  - `{{ . }}`{{ end }}{{ if .Config.Labels }}
-- Labels:{{ range $k, $v := .Config.Labels }}{{ "\n" }}  - `{{ $k }}={{ $v }}`{{ end }}{{ end }}' "$image"
+- Labels:{{ range $k, $v := .Config.Labels }}{{ "\n" }}  - `{{ $k }}={{ $v }}`{{ end }}{{ end }}' "$image" 2>/dev/null || :
 
-docker run --platform $platform --rm --volumes-from "$name-data" -v /etc/ssl repo-info:local-dpkg || :
+docker run --rm --volumes-from "$name-data" -v /etc/ssl -e DPKG_ARCH="$arch" repo-info:local-dpkg || :
