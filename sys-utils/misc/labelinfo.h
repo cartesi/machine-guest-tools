@@ -14,14 +14,14 @@
 #include <stdint.h>
 
 // Information about a memory range configured by the Cartesi machine and
-// looked up via its label under /run/cartesi/memoryranges/.
+// looked up via its label in the device tree /aliases node.
 struct labelinfo {
-    uint64_t start;           // physical start address of the memory range
-    uint64_t length;          // size of the memory range in bytes
+    uint64_t start;            // physical start address of the memory range
+    uint64_t length;           // size of the memory range in bytes
     char device[PATH_MAX + 1]; // e.g. "/dev/pmem0" or "/dev/uio0"
 };
 
-// Resolves <label> via /run/cartesi/memoryranges/ and fills *out with the
+// Resolves <label> via /proc/device-tree/aliases and fills *out with the
 // device path and the start/length of the associated memory range. On
 // failure, prints an error message prefixed by <prog> to stderr and returns
 // -1. On success, returns 0.
