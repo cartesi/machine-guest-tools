@@ -7,11 +7,13 @@
 //
 // http://www.apache.org/licenses/LICENSE-2.0
 
-// readmmap <label> <offset> <length>
+// readmmap <label> [<offset> [<length>]]
 //
-// Resolves <label> via /run/cartesi/memoryranges/, mmaps the associated
+// Resolves <label> via /proc/device-tree/aliases, mmaps the associated
 // device, and writes <length> bytes starting at <offset> (within the memory
-// range) to stdout. Useful for reading from UIO memory ranges (/dev/uioN)
+// range) to stdout. <offset> defaults to 0 and <length> defaults to the
+// remaining size of the memory range, so plain `readmmap <label>` writes
+// the entire range. Useful for reading from UIO memory ranges (/dev/uioN)
 // where ordinary read()/lseek() do not access the device memory.
 
 #include "labelinfo.h"
@@ -45,32 +47,39 @@ int main(int argc, char **argv) {
     const char *prog = strrchr(argv[0], '/');
     prog = prog ? prog + 1 : argv[0];
 
-    if (argc != 4) {
-        fprintf(stderr, "usage: %s <label> <offset> <length>\n", prog);
+    if (argc < 2 || argc > 4) {
+        fprintf(stderr, "usage: %s <label> [<offset> [<length>]]\n", prog);
         return 1;
     }
     const char *label = argv[1];
-    long long offset = 0;
-    long long length = 0;
-    if (parse_arg(argv[2], &offset) < 0) {
-        fprintf(stderr, "%s: invalid offset '%s'\n", prog, argv[2]);
-        return 1;
-    }
-    if (parse_arg(argv[3], &length) < 0) {
-        fprintf(stderr, "%s: invalid length '%s'\n", prog, argv[3]);
-        return 1;
-    }
 
     struct labelinfo info;
     if (labelinfo_lookup(prog, label, &info) < 0) {
         return 1;
     }
-    // Overflow-safe bounds check: offset <= info.length and length <= info.length - offset.
-    if ((uint64_t)offset > info.length || (uint64_t)length > info.length - (uint64_t)offset) {
-        fprintf(stderr,
-            "%s: [offset=0x%llx, length=0x%llx] exceeds range '%s' size 0x%" PRIx64 "\n",
-            prog, offset, length, label, info.length);
+
+    long long offset = 0;
+    if (argc >= 3 && parse_arg(argv[2], &offset) < 0) {
+        fprintf(stderr, "%s: invalid offset '%s'\n", prog, argv[2]);
         return 1;
+    }
+    if ((uint64_t)offset > info.length) {
+        fprintf(stderr, "%s: offset 0x%llx exceeds range '%s' size 0x%" PRIx64 "\n",
+            prog, offset, label, info.length);
+        return 1;
+    }
+    long long length = (long long)(info.length - (uint64_t)offset);
+    if (argc == 4) {
+        if (parse_arg(argv[3], &length) < 0) {
+            fprintf(stderr, "%s: invalid length '%s'\n", prog, argv[3]);
+            return 1;
+        }
+        if ((uint64_t)length > info.length - (uint64_t)offset) {
+            fprintf(stderr,
+                "%s: [offset=0x%llx, length=0x%llx] exceeds range '%s' size 0x%" PRIx64 "\n",
+                prog, offset, length, label, info.length);
+            return 1;
+        }
     }
     if (length == 0) {
         return 0;
