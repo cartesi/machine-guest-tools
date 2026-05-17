@@ -169,9 +169,9 @@ static int handle_inspect_state_request(cmt_rollup_t *me, struct parsed_args *ar
 
 static int handle_request(cmt_rollup_t *me, struct parsed_args *args, cmt_rollup_finish_t *finish, uint64_t *index) {
     switch (finish->next_request_type) {
-        case HTIF_YIELD_REASON_ADVANCE:
+        case HTIF_YIELD_REASON_ADVANCE_STATE:
             return handle_advance_state_request(me, args, index);
-        case HTIF_YIELD_REASON_INSPECT:
+        case HTIF_YIELD_REASON_INSPECT_STATE:
             return handle_inspect_state_request(me, args);
         default:
             /* unknown request type */
@@ -206,9 +206,9 @@ int main(int argc, char *argv[]) {
         if (handle_request(&rollup, &args, &finish, &advance_index) != 0) {
             break;
         }
-        reject_advance = (finish.next_request_type == HTIF_YIELD_REASON_ADVANCE) && (args.reject == advance_index);
-        reject_inspect = (finish.next_request_type == HTIF_YIELD_REASON_INSPECT) && args.reject_inspects;
-        throw_exception = (finish.next_request_type == HTIF_YIELD_REASON_ADVANCE) && (args.exception == advance_index);
+        reject_advance = (finish.next_request_type == HTIF_YIELD_REASON_ADVANCE_STATE) && (args.reject == advance_index);
+        reject_inspect = (finish.next_request_type == HTIF_YIELD_REASON_INSPECT_STATE) && args.reject_inspects;
+        throw_exception = (finish.next_request_type == HTIF_YIELD_REASON_ADVANCE_STATE) && (args.exception == advance_index);
         if (throw_exception) {
             char message[] = "exception";
             const cmt_abi_bytes_t payload = {

@@ -81,10 +81,10 @@ enum {
     HTIF_YIELD_MANUAL_REASON_TX_EXCEPTION = 4, /**< emit a exception and halt execution */
 };
 
-/** Reply reason when requesting @ref HTIF_YIELD_REASON_RX_ACCEPTED or HTIF_YIELD_REASON_RX_REJECTED */
+/** Reply reason when requesting @ref HTIF_YIELD_MANUAL_REASON_RX_ACCEPTED or HTIF_YIELD_MANUAL_REASON_RX_REJECTED */
 enum {
-    HTIF_YIELD_REASON_ADVANCE = 0, /**< Input is advance */
-    HTIF_YIELD_REASON_INSPECT = 1, /**< Input is inspect */
+    HTIF_YIELD_REASON_ADVANCE_STATE = 0, /**< Input is advance */
+    HTIF_YIELD_REASON_INSPECT_STATE = 1, /**< Input is inspect */
 };
 
 typedef struct {
