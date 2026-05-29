@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 #include "libcmt/io.h"
+#include "libcmt/ioctl.h"
 #include "libcmt/util.h"
 
 #include <stdbool.h>
@@ -26,8 +27,6 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <unistd.h>
-
-#include <linux/cartesi/cmio.h>
 
 int cmt_io_init(cmt_io_driver_t *_me) {
     int rc = 0;
@@ -43,8 +42,8 @@ int cmt_io_init(cmt_io_driver_t *_me) {
         return rc;
     }
 
-    struct cmio_setup setup;
-    if (ioctl(me->fd, IOCTL_CMIO_SETUP, &setup)) {
+    struct cmt_ioctl_cmio_setup setup;
+    if (ioctl(me->fd, CMT_IOCTL_CMIO_SETUP, &setup)) {
         rc = -errno;
         goto do_close;
     }
@@ -145,7 +144,7 @@ int cmt_io_yield(cmt_io_driver_t *_me, struct cmt_io_yield *rr) {
             rr->dev, rr->cmd, rr->reason, rr->data);
     }
     uint64_t req = pack(rr);
-    if (ioctl(me->fd, IOCTL_CMIO_YIELD, &req)) {
+    if (ioctl(me->fd, CMT_IOCTL_CMIO_YIELD, &req)) {
         return -errno;
     }
     *rr = unpack(req);
