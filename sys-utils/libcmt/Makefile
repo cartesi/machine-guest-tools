@@ -127,7 +127,6 @@ unittests_BINS := \
 	$(mock_OBJDIR)/abi-multi \
 	$(mock_OBJDIR)/abi-single \
 	$(mock_OBJDIR)/buf \
-	$(mock_OBJDIR)/gio \
 	$(mock_OBJDIR)/keccak \
 	$(mock_OBJDIR)/merkle \
 	$(mock_OBJDIR)/progress \
@@ -147,9 +146,6 @@ $(mock_OBJDIR)/keccak: tests/keccak.c $(mock_LIB)
 
 $(mock_OBJDIR)/merkle: tests/merkle.c $(mock_LIB)
 	$(CC) $(CFLAGS) -o $@ $^
-
-$(mock_OBJDIR)/gio: tests/gio.c tests/data.h $(mock_LIB)
-	$(CC) -Itests $(CFLAGS) -o $@ $^
 
 $(mock_OBJDIR)/rollup: tests/rollup.c tests/data.h $(mock_LIB)
 	$(CC) -Itests $(CFLAGS) -o $@ $^

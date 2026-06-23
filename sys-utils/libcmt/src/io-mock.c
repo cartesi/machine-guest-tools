@@ -61,7 +61,6 @@ int cmt_io_init(cmt_io_driver_t *_me) {
     me->output_seq = 0;
     me->report_seq = 0;
     me->exception_seq = 0;
-    me->gio_seq = 0;
 
     return 0;
 }
@@ -228,25 +227,6 @@ static int mock_tx_exception(cmt_io_driver_mock_t *me, struct cmt_io_yield *rr) 
     return store_next_output(me, "exception-", &me->exception_seq, rr);
 }
 
-static int mock_tx_gio(cmt_io_driver_mock_t *me, struct cmt_io_yield *rr) {
-    int rc = 0;
-    if (rr->cmd != HTIF_YIELD_CMD_MANUAL) {
-        (void) fprintf(stderr, "Expected cmd to be MANUAL\n");
-        return -EINVAL;
-    }
-
-    rc = store_next_output(me, "gio-", &me->gio_seq, rr);
-    if (rc) {
-        return rc;
-    }
-
-    rc = load_next_input(me, rr);
-    if (rc) {
-        return rc;
-    }
-    return 0;
-}
-
 /* These behaviours are defined by the cartesi-machine emulator */
 static int cmt_io_yield_inner(cmt_io_driver_t *_me, struct cmt_io_yield *rr) {
     cmt_io_driver_mock_t *me = &_me->mock;
@@ -260,7 +240,7 @@ static int cmt_io_yield_inner(cmt_io_driver_t *_me, struct cmt_io_yield *rr) {
             case HTIF_YIELD_MANUAL_REASON_TX_EXCEPTION:
                 return mock_tx_exception(me, rr);
             default:
-                return mock_tx_gio(me, rr);
+                return -EINVAL;
         }
     } else if (rr->cmd == HTIF_YIELD_CMD_AUTOMATIC) {
         switch (rr->reason) {

@@ -69,16 +69,6 @@ typedef struct cmt_rollup_finish {
     uint32_t next_request_payload_length;
 } cmt_rollup_finish_t;
 
-/** Public struct with generic io request/response */
-typedef struct cmt_gio {
-    uint16_t domain;               /**< domain for the gio request */
-    uint32_t id_length;            /**< length of id */
-    void *id;                      /**< id for the request */
-    uint16_t response_code;        /**< response */
-    uint32_t response_data_length; /**< length of response data */
-    void *response_data;           /**< response data */
-} cmt_gio_t;
-
 /** Initialize a @ref cmt_rollup_t state.
  *
  * @param [in] me uninitialized state
@@ -217,17 +207,6 @@ int cmt_rollup_read_inspect_state(cmt_rollup_t *me, cmt_rollup_inspect_t *inspec
  * |< 0| failure with a -errno value | */
 int cmt_rollup_finish(cmt_rollup_t *me, cmt_rollup_finish_t *finish);
 
-/** Performs a generic IO request
- *
- * @param [in,out] me  initialized cmt_rollup_t instance
- * @param [in,out] req initialized cmt_gio_t structure
- *
- * @return
- * |   |                             |
- * |--:|-----------------------------|
- * |  0| success                     |
- * |< 0| failure with a -errno value | */
-int cmt_gio_request(cmt_rollup_t *me, cmt_gio_t *req);
 
 /** Retrieve the merkle tree and intermediate state from a file @p path
  * @param [in,out] me      initialized cmt_rollup_t instance

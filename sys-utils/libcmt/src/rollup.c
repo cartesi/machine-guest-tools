@@ -386,52 +386,6 @@ int cmt_rollup_finish(cmt_rollup_t *me, cmt_rollup_finish_t *finish) {
     return 0;
 }
 
-int cmt_gio_request(cmt_rollup_t *me, cmt_gio_t *req) {
-    if (!me) {
-        return -EINVAL;
-    }
-    if (!req) {
-        return -EINVAL;
-    }
-
-    /* Accept empty id */
-    if (!req->id && req->id_length) {
-        return -EINVAL;
-    }
-
-    cmt_buf_t wr[1] = {cmt_io_get_tx(me->io)};
-    cmt_buf_t _[1];
-    if (cmt_buf_split(wr, req->id_length, wr, _)) {
-        return -ENOBUFS;
-    }
-    if (req->id) {
-        memcpy(wr->begin, req->id, req->id_length);
-    }
-
-    struct cmt_io_yield rr[1] = {{
-        .dev = HTIF_DEVICE_YIELD,
-        .cmd = HTIF_YIELD_CMD_MANUAL,
-        .reason = req->domain,
-        .data = req->id_length,
-    }};
-
-    int rc = DBG(cmt_io_yield(me->io, rr));
-    if (rc != 0) {
-        return rc;
-    }
-    me->fromhost_data = rr->data;
-
-    cmt_buf_t rd[1];
-    if (cmt_rollup_get_rx(me, rd)) {
-        return -ENOBUFS;
-    }
-
-    req->response_data = rd->begin;
-    req->response_code = rr->reason;
-    req->response_data_length = rr->data;
-    return 0;
-}
-
 int cmt_rollup_progress(cmt_rollup_t *me, uint32_t progress) {
     cmt_io_yield_t req[1] = {{
         .dev = HTIF_DEVICE_YIELD,

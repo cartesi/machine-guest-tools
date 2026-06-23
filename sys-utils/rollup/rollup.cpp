@@ -146,15 +146,6 @@ static void print_help(void) {
       where
         <hex-data> contains arbitrary data in hex
 
-    gio
-      performs a generic IO operation request based on a JSON object
-      read from stdin in the format
-        { "domain": <number>, "id": <hex-data> }
-      if successful, prints to stdout a JSON object in the format
-        { "code": <number>, "data": <hex-data> }
-      where
-        <hex-data> contains arbitrary data in hex
-
 )";
 }
 
@@ -423,37 +414,6 @@ static int finish_request(void) try {
     return 1;
 }
 
-// Read GIO request, issue operation, write response to output
-static int gio(void) try {
-    rollup r;
-    auto ji = nlohmann::json::parse(read_input());
-    auto id = unhex(ji["id"].get<std::string>());
-    auto domain = ji["domain"].get<uint16_t>();
-
-    cmt_gio req{.domain = domain,
-        .id_length = static_cast<uint32_t>(id.size()),
-        .id = id.data(),
-        .response_code = 0,
-        .response_data_length = 0,
-        .response_data = nullptr};
-
-    int ret = cmt_gio_request(r, &req);
-    if (ret)
-        return ret;
-
-    nlohmann::json j = {
-        {"code", req.response_code},
-        {"data", hex(reinterpret_cast<const uint8_t *>(req.response_data), req.response_data_length)},
-    };
-    std::cout << j.dump(2) << '\n';
-
-    return 0;
-
-} catch (std::exception &x) {
-    std::cerr << x.what() << '\n';
-    return 1;
-}
-
 // Figure out command and run it
 int main(int argc, char *argv[]) {
     if (argc < 2) {
@@ -477,8 +437,6 @@ int main(int argc, char *argv[]) {
         return accept_request();
     } else if (strcmp(command, "reject") == 0) {
         return reject_request();
-    } else if (strcmp(command, "gio") == 0) {
-        return gio();
     } else if (strcmp(command, "-h") == 0 || strcmp(command, "--help") == 0) {
         print_help();
         return 0;
