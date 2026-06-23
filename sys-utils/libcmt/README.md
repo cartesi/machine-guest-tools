@@ -3,13 +3,14 @@
 Is a C library to facilitate the development of applications running on the cartesi-machine.
 It handles the IO and communication protocol with the machine-emulator.
 
-The high level @ref libcmt\_rollup API provides functions for common operations, such as generating vouchers, notices, retrieving the next input, etc.
+The high level @ref libcmt\_rollup API provides functions for common operations, such as emitting outputs (notices/vouchers), emitting reports, throwing exceptions, and retrieving the next input. The @ref libcmt\_codec module provides encoding/decoding for known ABI formats like advance state and the Output1..Output4 envelopes.
 Check the [cartesi documentation](https://docs.cartesi.io/) for an explanation of the rollup interaction model.
 
 In addition to the above mentioned module, we provide @ref libcmt\_io\_driver, a thin abstraction of the linux kernel driver.
 
 And finally, a couple of utility modules used by the high level API are also exposed.
 - @ref libcmt\_abi is a Ethereum Virtual Machine Application Binary Interface (EVM-ABI) encoder / decoder.
+- @ref libcmt\_codec provides encoding/decoding for known ABI formats (advance state, Output1..Output4 envelopes).
 - @ref libcmt\_buf is a bounds checking buffer.
 - @ref libcmt\_merkle is a sparse merkle tree implementation on top of keccak.
 - @ref libcmt\_keccak is the hashing function used extensively by Ethereum.
@@ -99,32 +100,39 @@ echo -en "inspect-0" > 1.bin
 
 ## parsing outputs
 
-Decoding a @p Voucher:
+Outputs use the Output1..Output4 envelope format (see the [Output Indexing specification](https://github.com/cartesi/rollups-contracts/blob/feature/output-indexing-simpl/docs/output-indexing.md)).
+For example, a CALL voucher is encoded as:
 ```
-cast calldata-decode "Voucher(address,uint256,bytes)" 0x`xxd -p -c0 "$1"` | (
-    read address
-    read value
+Output2(bytes32[2],bytes)
+  args[0] = keccak256("cartesi.output.v1.call-voucher")
+  args[1] = bytes32(uint256(uint160(destination)))
+  data    = abi.encode(value, payload)
+```
+
+Decode a CALL voucher with `cast`:
+```
+cast calldata-decode "Output2(bytes32[2],bytes)" 0x`xxd -p -c0 "$1"` | (
+    read arg0
+    read arg1
     read bytes
 
     echo "{"
-    printf '\t"address" : "%s",\n' $address
-    printf '\t"value"   : "%s",\n' $value
-    printf '\t"bytes"   : "%s"\n' $bytes
+    printf '\t"arg0" : "%s",\n' $arg0
+    printf '\t"destination" : "%s",\n' $arg1
+    printf '\t"data" : "%s"\n' $bytes
     echo "}"
 )
-
-# sh decode-voucher.sh $1 | jq '.bytes' | xxd -r
 ```
 
-Decoding a @p Notice:
+Decode a Notice with `cast`:
 ```
-cast calldata-decode "Notice(bytes)" 0x`xxd -p -c0 "$1"` | (
+cast calldata-decode "Output1(bytes32[1],bytes)" 0x`xxd -p -c0 "$1"` | (
+    read arg0
     read bytes
 
     echo "{"
-    printf '\t"bytes"   : "%s"\n' $bytes
+    printf '\t"arg0" : "%s",\n' $arg0
+    printf '\t"data" : "%s"\n' $bytes
     echo "}"
 )
-
-# sh decode-notice.sh $1 | jq '.bytes' | xxd -r
 ```

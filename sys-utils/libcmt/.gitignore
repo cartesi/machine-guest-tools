@@ -2,3 +2,6 @@ build
 compile_flags.txt
 */*.clang-tidy*
 *.bin
+doc/html
+doc/theme
+compile_commands.json

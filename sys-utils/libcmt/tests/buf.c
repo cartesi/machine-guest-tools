@@ -19,42 +19,33 @@
 #include <stdio.h>
 #include <string.h>
 
-static void passing_null(void) {
-    uint8_t _[8];
-
-    // just test if it crashes
-    cmt_buf_init(NULL, sizeof _, _);
-    assert(cmt_buf_length(NULL) == 0);
-}
-
 static void split_in_bounds_must_succeed(void) {
-    uint8_t _[8];
-    cmt_buf_t b;
-    cmt_buf_init(&b, sizeof _, _);
-    assert(cmt_buf_length(&b) == 8);
+    uint8_t _[8] = {0};
+    cmt_buf_t b = cmt_buf_make(sizeof _, _);
+    assert(cmt_buf_length(b) == 8);
 
     { // everything to lhs
         cmt_buf_t lhs;
         cmt_buf_t rhs;
-        assert(cmt_buf_split(&b, 8, &lhs, &rhs) == 0);
-        assert(cmt_buf_length(&lhs) == 8);
-        assert(cmt_buf_length(&rhs) == 0);
+        assert(cmt_buf_split(b, 8, &lhs, &rhs) == 0);
+        assert(cmt_buf_length(lhs) == 8);
+        assert(cmt_buf_length(rhs) == 0);
     }
 
     { // everything to rhs
         cmt_buf_t lhs;
         cmt_buf_t rhs;
-        assert(cmt_buf_split(&b, 0, &lhs, &rhs) == 0);
-        assert(cmt_buf_length(&lhs) == 0);
-        assert(cmt_buf_length(&rhs) == 8);
+        assert(cmt_buf_split(b, 0, &lhs, &rhs) == 0);
+        assert(cmt_buf_length(lhs) == 0);
+        assert(cmt_buf_length(rhs) == 8);
     }
 
     { // handle alias (lhs)
         cmt_buf_t tmp = b;
         cmt_buf_t rhs;
-        assert(cmt_buf_split(&tmp, 8, &tmp, &rhs) == 0);
-        assert(cmt_buf_length(&tmp) == 8);
-        assert(cmt_buf_length(&rhs) == 0);
+        assert(cmt_buf_split(tmp, 8, &tmp, &rhs) == 0);
+        assert(cmt_buf_length(tmp) == 8);
+        assert(cmt_buf_length(rhs) == 0);
 
         assert(tmp.begin == b.begin);
     }
@@ -62,46 +53,50 @@ static void split_in_bounds_must_succeed(void) {
     { // handle alias (rhs)
         cmt_buf_t tmp = b;
         cmt_buf_t lhs;
-        assert(cmt_buf_split(&tmp, 8, &lhs, &tmp) == 0);
-        assert(cmt_buf_length(&lhs) == 8);
-        assert(cmt_buf_length(&tmp) == 0);
+        assert(cmt_buf_split(tmp, 8, &lhs, &tmp) == 0);
+        assert(cmt_buf_length(lhs) == 8);
+        assert(cmt_buf_length(tmp) == 0);
 
         assert(tmp.begin == b.end);
     }
-    printf("%s passed\n", __FUNCTION__);
+    printf("test %s passed\n", __func__);
 }
 
 static void split_out_of_bounds_must_fail(void) {
     uint8_t _[8];
-    cmt_buf_t b;
+    cmt_buf_t b = cmt_buf_make(sizeof _, _);
     cmt_buf_t lhs;
     cmt_buf_t rhs;
-    cmt_buf_init(&b, sizeof _, _);
 
-    assert(cmt_buf_split(&b, 9, &lhs, &rhs) == -ENOBUFS);
-    assert(cmt_buf_split(&b, SIZE_MAX, &lhs, &rhs) == -ENOBUFS);
-    printf("%s passed\n", __FUNCTION__);
+    assert(cmt_buf_split(b, 9, &lhs, &rhs) == -ENOBUFS);
+    assert(cmt_buf_split(b, SIZE_MAX, &lhs, &rhs) == -ENOBUFS);
+    printf("test %s passed\n", __func__);
 }
 
-static void split_invalid_parameters(void) {
+static void split_optional_outputs(void) {
     uint8_t _[8];
-    cmt_buf_t b;
+    cmt_buf_t b = cmt_buf_make(sizeof _, _);
     cmt_buf_t lhs;
     cmt_buf_t rhs;
-    cmt_buf_init(&b, sizeof _, _);
 
-    assert(cmt_buf_split(NULL, 8, &lhs, &rhs) == -EINVAL);
-    assert(cmt_buf_split(&b, 8, NULL, &rhs) == -EINVAL);
-    assert(cmt_buf_split(&b, 8, &lhs, NULL) == -EINVAL);
+    { // lhs is NULL
+        assert(cmt_buf_split(b, 4, NULL, &rhs) == 0);
+        assert(cmt_buf_length(rhs) == 4);
+        assert(rhs.begin == b.begin + 4);
+    }
+
+    { // rhs is NULL
+        assert(cmt_buf_split(b, 4, &lhs, NULL) == 0);
+        assert(cmt_buf_length(lhs) == 4);
+        assert(lhs.begin == b.begin);
+    }
+    printf("test %s passed\n", __func__);
 }
 
 static void split_by_comma_until_the_end(void) {
     uint8_t _[] = "a,b,c";
-    cmt_buf_t x;
-    cmt_buf_t xs;
-
-    cmt_buf_init(&x, sizeof _ - 1, _);
-    cmt_buf_init(&xs, sizeof _ - 1, _);
+    cmt_buf_t x = cmt_buf_make(sizeof _ - 1, _);
+    cmt_buf_t xs = cmt_buf_make(sizeof _ - 1, _);
     assert(cmt_buf_split_by_comma(&x, &xs) == true);
     assert(strncmp((char *) x.begin, "a", 1UL) == 0);
     assert(cmt_buf_split_by_comma(&x, &xs) == true);
@@ -122,10 +117,9 @@ static void xxd(void) {
 }
 
 int main(void) {
-    passing_null();
     split_in_bounds_must_succeed();
     split_out_of_bounds_must_fail();
-    split_invalid_parameters();
+    split_optional_outputs();
     split_by_comma_until_the_end();
     xxd();
     return 0;

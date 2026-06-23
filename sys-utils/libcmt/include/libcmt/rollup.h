@@ -17,8 +17,7 @@
  * @defgroup libcmt_rollup rollup
  * Rollup abstraction layer
  *
- * Takes care of @ref libcmt_io_driver interactions, @ref libcmt_abi
- * encoding/decoding and @ref libcmt_merkle tree handling.
+ * Takes care of @ref libcmt_io interactions and @ref libcmt_merkle handling.
  *
  * Mocked version has support for simulating I/O via environment variables:
  * @p CMT_INPUTS="0:input.bin,..." and verbose output with @p CMT_DEBUG=yes.
@@ -31,13 +30,11 @@
  * @{ */
 #ifndef CMT_ROLLUP_H
 #define CMT_ROLLUP_H
-#include "abi.h"
 #include "io.h"
 #include "merkle.h"
 
 typedef struct cmt_rollup {
-    union cmt_io_driver io[1];
-    uint32_t fromhost_data;
+    union cmt_io io[1];
     cmt_merkle_t merkle[1];
 
     // cache merkle values and repeat them on finish when the tree doesn't change
@@ -45,40 +42,19 @@ typedef struct cmt_rollup {
     uint64_t finish_leaf_count;
 } cmt_rollup_t;
 
-/** Public struct with the advance state contents */
-typedef struct cmt_rollup_advance {
-    uint64_t chain_id;                        /**< network */
-    cmt_abi_address_t app_contract;           /**< application contract address */
-    cmt_abi_address_t msg_sender;             /**< input sender address */
-    uint64_t block_number;                    /**< block number of this input */
-    uint64_t block_timestamp;                 /**< block timestamp of this input UNIX epoch format) */
-    cmt_abi_u256_t prev_randao;               /**< The latest RANDAO mix of the post beacon state of the previous block */
-    uint64_t index;                           /**< input index (in relation to all inputs ever sent to the DApp) */
-    cmt_abi_bytes_t payload;                  /**< payload for this input */
-} cmt_rollup_advance_t;
-
-/** Public struct with the inspect state contents */
-typedef struct cmt_rollup_inspect {
-    cmt_abi_bytes_t payload; /**< payload for this input */
-} cmt_rollup_inspect_t;
-
-/** Public struct with the finish state contents */
-typedef struct cmt_rollup_finish {
-    bool accept_previous_request;
-    int next_request_type;
-    uint32_t next_request_payload_length;
-} cmt_rollup_finish_t;
-
 /** Initialize a @ref cmt_rollup_t state.
  *
- * @param [in] me uninitialized state
+ * @param [in]  me uninitialized state
+ * @param [out] tx optional; if not NULL, will be set to the underlying io tx buffer
+ *                 for encoding. This allows the caller to access the tx buffer
+ *                 without calling @ref cmt_io_get_tx.
  *
  * @return
  * |   |                             |
  * |--:|-----------------------------|
  * |  0| success                     |
  * |< 0| failure with a -errno value | */
-int cmt_rollup_init(cmt_rollup_t *me);
+int cmt_rollup_init(cmt_rollup_t *me, cmt_buf_t *tx);
 
 /** Finalize a @ref cmt_rollup_t state previously initialized with @ref
  * cmt_rollup_init
@@ -88,55 +64,27 @@ int cmt_rollup_init(cmt_rollup_t *me);
  * @note use of @p me after this call is undefined behavior. */
 void cmt_rollup_fini(cmt_rollup_t *me);
 
-/** Emit a voucher
+/** Access the internal io driver for advanced use cases.
  *
- * Equivalent to the `Voucher(address,uint256,bytes)` solidity call.
+ * @param [in] me    initialized state
  *
- * @param [in,out] me             initialized @ref cmt_rollup_t instance
- * @param [in]     address        destination data
- * @param [in]     value          value data
- * @param [in]     data           message contents
- * @param [out]    index          index of emitted voucher, if successful
+ * @return internal io driver state
  *
- * @return
- * |   |                             |
- * |--:|-----------------------------|
- * |  0| success                     |
- * |< 0| failure with a -errno value | */
-int cmt_rollup_emit_voucher(cmt_rollup_t *me, const cmt_abi_address_t *address, const cmt_abi_u256_t *value, const cmt_abi_bytes_t *data, uint64_t *index);
+ */
+cmt_io_t *cmt_rollup_get_io(cmt_rollup_t *me);
 
-/** Emit a delegate call voucher
+/** Access the internal merkle tree state for advanced use cases.
  *
- * Equivalent to the `DelegateCallVoucher(address,bytes)` solidity call.
+ * @param [in] me    initialized state
  *
- * @param [in,out] me             initialized @ref cmt_rollup_t instance
- * @param [in]     address        destination data
- * @param [in]     data           message contents
- * @param [out]    index          index of emitted voucher, if successful
+ * @return internal merkle tree state
  *
- * @return
- * |   |                             |
- * |--:|-----------------------------|
- * |  0| success                     |
- * |< 0| failure with a -errno value | */
-int cmt_rollup_emit_delegate_call_voucher(cmt_rollup_t *me, const cmt_abi_address_t *address, const cmt_abi_bytes_t *data, uint64_t *index);
+ */
+cmt_merkle_t *cmt_rollup_get_merkle(cmt_rollup_t *me);
 
-/** Emit a notice
+/** Emit a on chain verifiable output
  *
- * @param [in,out] me          initialized cmt_rollup_t instance
- * @param [in]     data        message contents
- * @param [out]    index       index of emitted notice, if successful
- *
- * @return
- * |   |                             |
- * |--:|-----------------------------|
- * |  0| success                     |
- * |< 0| failure with a -errno value | */
-int cmt_rollup_emit_notice(cmt_rollup_t *me, const cmt_abi_bytes_t *payload, uint64_t *index);
-
-/** Emit a report
- * @param [in,out] me      initialized cmt_rollup_t instance
- * @param [in]     n       sizeof @p data in bytes
+ * @param [in,out] me      initialized @ref cmt_rollup_t instance
  * @param [in]     data    message contents
  *
  * @return
@@ -144,19 +92,29 @@ int cmt_rollup_emit_notice(cmt_rollup_t *me, const cmt_abi_bytes_t *payload, uin
  * |--:|-----------------------------|
  * |  0| success                     |
  * |< 0| failure with a -errno value | */
-int cmt_rollup_emit_report(cmt_rollup_t *me, const cmt_abi_bytes_t *payload);
+int cmt_rollup_emit_output(cmt_rollup_t *me, cmt_buf_t data);
 
-/** Emit a exception
- * @param [in,out] me          initialized cmt_rollup_t instance
- * @param [in]     data_length data length in bytes
- * @param [in]     data        message contents
+/** Emit a report
+ * @param [in,out] me      initialized cmt_rollup_t instance
+ * @param [in]     data    message contents
  *
  * @return
  * |   |                             |
  * |--:|-----------------------------|
  * |  0| success                     |
  * |< 0| failure with a -errno value | */
-int cmt_rollup_emit_exception(cmt_rollup_t *me, const cmt_abi_bytes_t *payload);
+int cmt_rollup_emit_report(cmt_rollup_t *me, cmt_buf_t data);
+
+/** Emit a exception
+ * @param [in,out] me      initialized cmt_rollup_t instance
+ * @param [in]     data    message contents
+ *
+ * @return
+ * |   |                             |
+ * |--:|-----------------------------|
+ * |  0| success                     |
+ * |< 0| failure with a -errno value | */
+int cmt_rollup_emit_exception(cmt_rollup_t *me, cmt_buf_t data);
 
 /** Report progress
  *
@@ -170,70 +128,31 @@ int cmt_rollup_emit_exception(cmt_rollup_t *me, const cmt_abi_bytes_t *payload);
  * |< 0| failure with a -errno value | */
 int cmt_rollup_progress(cmt_rollup_t *me, uint32_t progress);
 
-/** Read advance state
+/** Accept or Reject the current input; wait for the next input
  *
- * @param [in,out] me      initialized cmt_rollup_t instance
- * @param [out]    advance cmt_rollup_advance_t instance (may be uninitialized)
+ * @param [in,out] me        initialized cmt_rollup_t instance
+ * @param [in]     accept    true to accept current input, false to reject it
+ * @param [out]    out       input data
  *
+ * ```c
+ * // example with error handling
+ * int req_type = cmt_rollup_wait_for_input(R, true, rx);
+ * if (req_type < 0) {
+ *     return EXIT_FAILURE;
+ * }
+ * switch (req_type) {
+ * case HTIF_YIELD_REASON_ADVANCE:
+ *     break;
+ * case HTIF_YIELD_REASON_INSPECT:
+ *     break;
+ * }
+ * ```
  * @return
- * |   |                             |
- * |--:|-----------------------------|
- * |  0| success                     |
- * |< 0| failure with a -errno value | */
-int cmt_rollup_read_advance_state(cmt_rollup_t *me, cmt_rollup_advance_t *advance);
-
-/** Read inspect state
- *
- * @param [in,out] me      initialized cmt_rollup_t instance
- * @param [out]    inspect cmt_rollup_inspect_t instance (may be uninitialized)
- *
- * @return
- * |   |                             |
- * |--:|-----------------------------|
- * |  0| success                     |
- * |< 0| failure with a -errno value | */
-int cmt_rollup_read_inspect_state(cmt_rollup_t *me, cmt_rollup_inspect_t *inspect);
-
-/** Finish processing of current advance or inspect.
- * Waits for and returns the next advance or inspect query when available.
- *
- * @param [in,out] me      initialized cmt_rollup_t instance
- * @param [in,out] finish  initialized cmt_rollup_finish_t instance
- *
- * @return
- * |   |                             |
- * |--:|-----------------------------|
- * |  0| success                     |
- * |< 0| failure with a -errno value | */
-int cmt_rollup_finish(cmt_rollup_t *me, cmt_rollup_finish_t *finish);
-
-
-/** Retrieve the merkle tree and intermediate state from a file @p path
- * @param [in,out] me      initialized cmt_rollup_t instance
- * @param [in]     file    path to file (parent directories must exist)
- *
- * @return
- * |   |                             |
- * |--:|-----------------------------|
- * |  0| success                     |
- * |< 0| failure with a -errno value | */
-int cmt_rollup_load_merkle(cmt_rollup_t *me, const char *path);
-
-/** Store the merkle tree and intermediate state to a file @p path
- *
- * @param [in,out] me      initialized cmt_rollup_t instance
- * @param [in]     file    path to file (parent directories must exist)
- *
- * @return
- * |   |                             |
- * |--:|-----------------------------|
- * |  0| success                     |
- * |< 0| failure with a -errno value | */
-int cmt_rollup_save_merkle(cmt_rollup_t *me, const char *path);
-
-/** Resets the merkle tree to pristine conditions
- *
- * @param [in,out] me      initialized cmt_rollup_t instance */
-void cmt_rollup_reset_merkle(cmt_rollup_t *me);
+ * |                           |                               |
+ * |--------------------------:|-------------------------------|
+ * | HTIF_YIELD_REASON_INSPECT | inspect request               |
+ * | HTIF_YIELD_REASON_INSPECT | advance request               |
+ * |                       < 0 | `errno` value for description | */
+int cmt_rollup_wait_for_input(cmt_rollup_t *me, bool accept, cmt_buf_t *out);
 
 #endif /* CMT_ROLLUP_H */

@@ -22,9 +22,9 @@
 #include <string.h>
 
 /** track the number of open "devices". Mimic the kernel driver behavior by limiting it to 1 */
-static int open_count = 0;
+static int open_count = 0; // NOLINT
 
-int cmt_io_init(cmt_io_driver_t *_me) {
+int cmt_io_init(cmt_io_t *_me) {
     if (!_me) {
         return -EINVAL;
     }
@@ -33,12 +33,12 @@ int cmt_io_init(cmt_io_driver_t *_me) {
     }
 
     open_count++;
-    cmt_io_driver_mock_t *me = &_me->mock;
+    cmt_io_mock_t *me = &_me->mock;
 
     size_t tx_length = 2U << 20; // 2MB
     size_t rx_length = 2U << 20; // 2MB
-    cmt_buf_init(me->tx, tx_length, malloc(tx_length));
-    cmt_buf_init(me->rx, rx_length, malloc(rx_length));
+    *me->tx = cmt_buf_make(tx_length, calloc(tx_length, 1));
+    *me->rx = cmt_buf_make(rx_length, calloc(rx_length, 1));
 
     if (!me->tx->begin || !me->rx->begin) {
         free(me->tx->begin);
@@ -48,9 +48,9 @@ int cmt_io_init(cmt_io_driver_t *_me) {
 
     char *inputs = getenv("CMT_INPUTS");
     if (inputs) {
-        cmt_buf_init(&me->inputs_left, strlen(inputs), inputs);
+        me->inputs_left = cmt_buf_make(strlen(inputs), inputs);
     } else {
-        cmt_buf_init(&me->inputs_left, 0, "");
+        me->inputs_left = cmt_buf_make(0, "");
     }
 
     // in case the user writes something before loading any input
@@ -65,7 +65,7 @@ int cmt_io_init(cmt_io_driver_t *_me) {
     return 0;
 }
 
-void cmt_io_fini(cmt_io_driver_t *_me) {
+void cmt_io_fini(cmt_io_t *_me) {
     if (!_me) {
         return;
     }
@@ -75,7 +75,7 @@ void cmt_io_fini(cmt_io_driver_t *_me) {
     }
 
     open_count--;
-    cmt_io_driver_mock_t *me = &_me->mock;
+    cmt_io_mock_t *me = &_me->mock;
 
     free(me->tx->begin);
     free(me->rx->begin);
@@ -83,7 +83,7 @@ void cmt_io_fini(cmt_io_driver_t *_me) {
     memset(_me, 0, sizeof(*_me));
 }
 
-cmt_buf_t cmt_io_get_tx(cmt_io_driver_t *me) {
+cmt_buf_t cmt_io_get_tx(cmt_io_t *me) {
     cmt_buf_t empty = {NULL, NULL};
     if (!me) {
         return empty;
@@ -91,7 +91,7 @@ cmt_buf_t cmt_io_get_tx(cmt_io_driver_t *me) {
     return *me->mock.tx;
 }
 
-cmt_buf_t cmt_io_get_rx(cmt_io_driver_t *me) {
+cmt_buf_t cmt_io_get_rx(cmt_io_t *me) {
     cmt_buf_t empty = {NULL, NULL};
     if (!me) {
         return empty;
@@ -99,19 +99,27 @@ cmt_buf_t cmt_io_get_rx(cmt_io_driver_t *me) {
     return *me->mock.rx;
 }
 
-static int load_next_input(cmt_io_driver_mock_t *me, struct cmt_io_yield *rr) {
+static int load_next_input(cmt_io_mock_t *me, struct cmt_io_yield *rr) {
     cmt_buf_t current_input;
+    char typestr[16] = {0};
     char filepath[128] = {0};
     if (!cmt_buf_split_by_comma(&current_input, &me->inputs_left)) {
         return -EINVAL;
     }
-    // NOLINTNEXTLINE(cert-err34-c,clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling)
-    if (sscanf((char *) current_input.begin, "%d:%127[^,]", &me->input_type, filepath) != 2) {
+
+    // parse typestr as a string and then convert it to a number so we can detect errors
+    if (sscanf((char *) current_input.begin, "%15[^:]:%127[^,]", typestr, filepath) != 2) {
         return -EINVAL;
     }
+    char *end = NULL;
+    unsigned long type = strtoul(typestr, &end, 10);
+    if (*end != '\0' || type > UINT16_MAX) {
+        return -EINVAL;
+    }
+    me->input_type = (int) type;
 
     size_t file_length = 0;
-    int rc = cmt_util_read_whole_file(filepath, cmt_buf_length(me->rx), me->rx->begin, &file_length);
+    int rc = cmt_util_read_whole_file(filepath, cmt_buf_length(*me->rx), me->rx->begin, &file_length);
     if (rc) {
         if (cmt_util_debug_enabled()) {
             (void) fprintf(stderr, "failed to load \"%s\". %s\n", filepath, strerror(-rc));
@@ -138,8 +146,8 @@ static int load_next_input(cmt_io_driver_mock_t *me, struct cmt_io_yield *rr) {
     return 0;
 }
 
-static int store_output(cmt_io_driver_mock_t *me, const char *filepath, struct cmt_io_yield *rr) {
-    if (rr->data > cmt_buf_length(me->rx)) {
+static int store_output(cmt_io_mock_t *me, const char *filepath, struct cmt_io_yield *rr) {
+    if (rr->data > cmt_buf_length(*me->rx)) {
         return -ENOBUFS;
     }
 
@@ -154,14 +162,14 @@ static int store_output(cmt_io_driver_mock_t *me, const char *filepath, struct c
     return 0;
 }
 
-static int store_next_output(cmt_io_driver_mock_t *me, char *ns, int *seq, struct cmt_io_yield *rr) {
+static int store_next_output(cmt_io_mock_t *me, char *ns, int *seq, struct cmt_io_yield *rr) {
     char filepath[128 + 32 + 8 + 16];
     // NOLINTNEXTLINE(cert-err33-c, clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling)
     snprintf(filepath, sizeof filepath, "%s.%s%d%s", me->input_filename, ns, (*seq)++, me->input_fileext);
     return store_output(me, filepath, rr);
 }
 
-static int mock_progress(cmt_io_driver_mock_t *me, struct cmt_io_yield *rr) {
+static int mock_progress(cmt_io_mock_t *me, struct cmt_io_yield *rr) {
     (void) me;
     if (rr->cmd != HTIF_YIELD_CMD_AUTOMATIC) {
         (void) fprintf(stderr, "Expected cmd to be AUTOMATIC\n");
@@ -171,7 +179,7 @@ static int mock_progress(cmt_io_driver_mock_t *me, struct cmt_io_yield *rr) {
     return 0;
 }
 
-static int mock_rx_accepted(cmt_io_driver_mock_t *me, struct cmt_io_yield *rr) {
+static int mock_rx_accepted(cmt_io_mock_t *me, struct cmt_io_yield *rr) {
     if (rr->cmd != HTIF_YIELD_CMD_MANUAL) {
         (void) fprintf(stderr, "Expected cmd to be MANUAL\n");
         return -EINVAL;
@@ -191,19 +199,19 @@ static int mock_rx_accepted(cmt_io_driver_mock_t *me, struct cmt_io_yield *rr) {
     return 0;
 }
 
-static int mock_rx_rejected(cmt_io_driver_mock_t *me, struct cmt_io_yield *rr) {
+static int mock_rx_rejected(cmt_io_mock_t *me, struct cmt_io_yield *rr) {
     if (rr->cmd != HTIF_YIELD_CMD_MANUAL) {
         (void) fprintf(stderr, "Expected cmd to be MANUAL\n");
         return -EINVAL;
     }
     (void) fprintf(stderr, "%s:%d no revert for the mock implementation\n", __FILE__, __LINE__);
     if (load_next_input(me, rr)) {
-        return -ENOSYS;
+        return -ENODATA;
     }
-    return 0;
+    return -ENOSYS;
 }
 
-static int mock_tx_output(cmt_io_driver_mock_t *me, struct cmt_io_yield *rr) {
+static int mock_tx_output(cmt_io_mock_t *me, struct cmt_io_yield *rr) {
     if (rr->cmd != HTIF_YIELD_CMD_AUTOMATIC) {
         (void) fprintf(stderr, "Expected cmd to be AUTOMATIC\n");
         return -EINVAL;
@@ -211,7 +219,7 @@ static int mock_tx_output(cmt_io_driver_mock_t *me, struct cmt_io_yield *rr) {
     return store_next_output(me, "output-", &me->output_seq, rr);
 }
 
-static int mock_tx_report(cmt_io_driver_mock_t *me, struct cmt_io_yield *rr) {
+static int mock_tx_report(cmt_io_mock_t *me, struct cmt_io_yield *rr) {
     if (rr->cmd != HTIF_YIELD_CMD_AUTOMATIC) {
         (void) fprintf(stderr, "Expected cmd to be AUTOMATIC\n");
         return -EINVAL;
@@ -219,7 +227,7 @@ static int mock_tx_report(cmt_io_driver_mock_t *me, struct cmt_io_yield *rr) {
     return store_next_output(me, "report-", &me->report_seq, rr);
 }
 
-static int mock_tx_exception(cmt_io_driver_mock_t *me, struct cmt_io_yield *rr) {
+static int mock_tx_exception(cmt_io_mock_t *me, struct cmt_io_yield *rr) {
     if (rr->cmd != HTIF_YIELD_CMD_MANUAL) {
         (void) fprintf(stderr, "Expected cmd to be MANUAL\n");
         return -EINVAL;
@@ -228,8 +236,8 @@ static int mock_tx_exception(cmt_io_driver_mock_t *me, struct cmt_io_yield *rr) 
 }
 
 /* These behaviours are defined by the cartesi-machine emulator */
-static int cmt_io_yield_inner(cmt_io_driver_t *_me, struct cmt_io_yield *rr) {
-    cmt_io_driver_mock_t *me = &_me->mock;
+static int cmt_io_yield_inner(cmt_io_t *_me, struct cmt_io_yield *rr) {
+    cmt_io_mock_t *me = &_me->mock;
 
     if (rr->cmd == HTIF_YIELD_CMD_MANUAL) {
         switch (rr->reason) {
@@ -261,7 +269,7 @@ static int cmt_io_yield_inner(cmt_io_driver_t *_me, struct cmt_io_yield *rr) {
 }
 
 /* emulate io.c:cmt_io_yield behavior (go and check it does if you change it) */
-int cmt_io_yield(cmt_io_driver_t *_me, struct cmt_io_yield *rr) {
+int cmt_io_yield(cmt_io_t *_me, struct cmt_io_yield *rr) {
     if (!_me) {
         return -EINVAL;
     }

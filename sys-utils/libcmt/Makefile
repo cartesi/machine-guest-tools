@@ -17,7 +17,7 @@
 PREFIX ?= /usr
 CC := $(TOOLCHAIN_PREFIX)gcc
 AR := $(TOOLCHAIN_PREFIX)ar
-CFLAGS += -Wvla -O2 -g -Wall -Wextra -Iinclude \
+CFLAGS += -std=gnu23 -Wvla -O2 -g -Wall -Wextra -Iinclude \
           -fno-strict-aliasing -fno-strict-overflow -fPIC
 LIBCMT_CFLAGS += -ftrivial-auto-var-init=zero -Wstrict-aliasing=3
 
@@ -81,7 +81,7 @@ install-dev: $(libcmt_LIB) build/ffi.h
 	cp -f include/libcmt/*.h $(DESTDIR)$(PREFIX)/include/libcmt/
 	cp -f build/ffi.h $(DESTDIR)$(PREFIX)/include/libcmt/
 	mkdir -p $(DESTDIR)$(PREFIX)/lib/pkgconfig
-	sed -e 's|@PREFIX@|$(PREFIX)|g' \
+	sed -e 's|@ARG_PREFIX@|$(PREFIX)|g' \
 	    tools/libcmt.pc.in > $(DESTDIR)$(PREFIX)/lib/pkgconfig/libcmt.pc
 
 install: install-run install-dev
@@ -127,6 +127,7 @@ unittests_BINS := \
 	$(mock_OBJDIR)/abi-multi \
 	$(mock_OBJDIR)/abi-single \
 	$(mock_OBJDIR)/buf \
+	$(mock_OBJDIR)/io \
 	$(mock_OBJDIR)/keccak \
 	$(mock_OBJDIR)/merkle \
 	$(mock_OBJDIR)/progress \
@@ -139,6 +140,9 @@ $(mock_OBJDIR)/abi-single: tests/abi-single.c $(mock_LIB)
 	$(CC) $(CFLAGS) -o $@ $^
 
 $(mock_OBJDIR)/buf: tests/buf.c $(mock_LIB)
+	$(CC) $(CFLAGS) -o $@ $^
+
+$(mock_OBJDIR)/io: tests/io.c $(mock_LIB)
 	$(CC) $(CFLAGS) -o $@ $^
 
 $(mock_OBJDIR)/keccak: tests/keccak.c $(mock_LIB)
@@ -156,13 +160,21 @@ $(mock_OBJDIR)/progress: tests/progress.c $(mock_LIB)
 test: $(unittests_BINS)
 	$(foreach test,$(unittests_BINS),$(test) &&) true
 
+cov: $(unittests_BINS)
+	$(foreach test,$(unittests_BINS),\
+		mkdir -p build/kcov/unittests/$(notdir $(test)); \
+		kcov --clean build/kcov/unittests/$(notdir $(test)) $(test); \
+	)
+	@kcov --clean --merge build/kcov/merged build/kcov/unittests/*
+
+
 tests/data.h: tests/create-data.sh
 	$< > $@
 
 #-------------------------------------------------------------------------------
 tools_OBJDIR := build/tools
 tools_BINS := \
-	$(tools_OBJDIR)/funsel
+	$(tools_OBJDIR)/funsel \
 
 $(tools_OBJDIR)/funsel: tools/funsel.c $(mock_LIB)
 	@mkdir -p $(@D)

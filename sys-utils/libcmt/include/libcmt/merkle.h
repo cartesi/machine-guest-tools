@@ -39,11 +39,6 @@ typedef struct {
  * @param [in] me    uninitialized state */
 void cmt_merkle_init(cmt_merkle_t *me);
 
-/** Resets a @ref cmt_merkle_t to pristine conditions.
- *
- * @param [in] me    initialized state */
-void cmt_merkle_reset(cmt_merkle_t *me);
-
 /** Finalize a @ref cmt_merkle_t tree state.
  *
  * @param [in] me    initialized state

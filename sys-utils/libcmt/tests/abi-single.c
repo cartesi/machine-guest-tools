@@ -17,204 +17,25 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <stdio.h>
 #include <string.h>
 
 /** Declare a cmt_buf_t with stack backed memory.
  * @param [in] N - size in bytes
  * @note don't port */
-#define CMT_BUF_DECL(S, L) cmt_buf_t S[1] = {{.begin = (uint8_t[L]){0}, .end = (S)->begin + (L)}}
+#define CMT_BUF_DECL(S, L) cmt_buf_t S[1] = {cmt_buf_make((L), (uint8_t[L]){0})}
 
 /** Declare a cmt_buf_t with parameters backed memory.
  * @param [in] L - size in bytes
  * @note don't port */
-#define CMT_BUF_DECL3(S, L, P) cmt_buf_t S[1] = {{.begin = (P), .end = (S)->begin + (L)}}
+#define CMT_BUF_DECL3(S, L, P) cmt_buf_t S[1] = {cmt_buf_make((L), (P))}
 
 // funsel(address)
 #define FUNSEL CMT_ABI_FUNSEL(0xe6, 0x36, 0xe3, 0x33)
 
-static void abi_funsel(void) {
-    assert(cmt_abi_funsel(0xe6, 0x36, 0xe3, 0x33) == FUNSEL);
-}
-
-static void encode_u8(void) {
-    uint8_t x = 0x01;
-    uint8_t en[CMT_ABI_U256_LENGTH];
-    uint8_t be[CMT_ABI_U256_LENGTH] = {
-        // clang-format off
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
-        // clang-format on
-    };
-    cmt_abi_encode_uint(sizeof(x), (void *) &x, en);
-    assert(memcmp(en, be, sizeof(be)) == 0);
-}
-
-static void encode_u16(void) {
-    uint16_t x = UINT16_C(0x0123);
-    uint8_t en[CMT_ABI_U256_LENGTH];
-    uint8_t be[CMT_ABI_U256_LENGTH] = {
-        // clang-format off
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x23,
-        // clang-format on
-    };
-    cmt_abi_encode_uint(sizeof(x), (void *) &x, en);
-    assert(memcmp(en, be, sizeof(be)) == 0);
-}
-
-static void encode_u32(void) {
-    uint32_t x = UINT32_C(0x01234567);
-    uint8_t en[CMT_ABI_U256_LENGTH];
-    uint8_t be[CMT_ABI_U256_LENGTH] = {
-        // clang-format off
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x23, 0x45, 0x67,
-        // clang-format on
-    };
-    cmt_abi_encode_uint(sizeof(x), (void *) &x, en);
-    assert(memcmp(en, be, sizeof(be)) == 0);
-}
-
-static void encode_u64(void) {
-    uint64_t x = UINT64_C(0x0123456789abcdef);
-    uint8_t en[CMT_ABI_U256_LENGTH];
-    uint8_t be[CMT_ABI_U256_LENGTH] = {
-        // clang-format off
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
-        // clang-format on
-    };
-    cmt_abi_encode_uint(sizeof(x), (void *) &x, en);
-    assert(memcmp(en, be, sizeof(be)) == 0);
-}
-
-static void encode_u256(void) {
-    uint8_t x[CMT_ABI_U256_LENGTH] = {
-        // clang-format off
-        0x1f, 0x1e, 0x1d, 0x1c, 0x1b, 0x1a, 0x19, 0x18, 0x17, 0x16, 0x15, 0x14, 0x13, 0x12, 0x11, 0x10,
-        0x0f, 0x0e, 0x0d, 0x0c, 0x0b, 0x0a, 0x09, 0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01, 0x00,
-        // clang-format on
-    };
-    uint8_t en[CMT_ABI_U256_LENGTH];
-    uint8_t be[CMT_ABI_U256_LENGTH] = {
-        // clang-format off
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
-        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
-        // clang-format on
-    };
-    cmt_abi_encode_uint(sizeof(x), (void *) &x, en);
-    assert(memcmp(en, be, sizeof(be)) == 0);
-}
-
-static void encode_edom(void) {
-    uint8_t x[CMT_ABI_U256_LENGTH + 1] = {
-        // clang-format off
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
-        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
-        0x20,
-        // clang-format on
-    };
-    uint8_t en[CMT_ABI_U256_LENGTH];
-    assert(cmt_abi_encode_uint_nr(sizeof(x), x, en) == -EDOM);
-    assert(cmt_abi_encode_uint_nn(sizeof(x), x, en) == -EDOM);
-}
-
-static void decode_u8(void) {
-    uint8_t x = 0;
-    uint8_t ex = 0x01;
-    uint8_t be[CMT_ABI_U256_LENGTH] = {
-        // clang-format off
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
-        // clang-format on
-    };
-    assert(cmt_abi_decode_uint(be, sizeof(x), (void *) &x) == 0);
-    assert(x == ex);
-}
-
-static void decode_u16(void) {
-    uint16_t x = 0;
-    uint16_t ex = UINT16_C(0x0123);
-    uint8_t be[CMT_ABI_U256_LENGTH] = {
-        // clang-format off
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x23,
-        // clang-format on
-    };
-    assert(cmt_abi_decode_uint(be, sizeof(x), (void *) &x) == 0);
-    assert(x == ex);
-}
-
-static void decode_u32(void) {
-    uint32_t x = 0;
-    uint32_t ex = UINT32_C(0x01234567);
-    uint8_t be[CMT_ABI_U256_LENGTH] = {
-        // clang-format off
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x23, 0x45, 0x67,
-        // clang-format on
-    };
-    assert(cmt_abi_decode_uint(be, sizeof(x), (void *) &x) == 0);
-    assert(x == ex);
-}
-
-static void decode_u64(void) {
-    uint64_t x = 0;
-    uint64_t ex = UINT64_C(0x0123456789abcdef);
-    uint8_t be[CMT_ABI_U256_LENGTH] = {
-        // clang-format off
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
-        // clang-format on
-    };
-    assert(cmt_abi_decode_uint(be, sizeof(x), (void *) &x) == 0);
-    assert(x == ex);
-}
-
-static void decode_u256(void) {
-    uint8_t x[CMT_ABI_U256_LENGTH];
-    uint8_t ex[CMT_ABI_U256_LENGTH] = {
-        // clang-format off
-        0x1f, 0x1e, 0x1d, 0x1c, 0x1b, 0x1a, 0x19, 0x18, 0x17, 0x16, 0x15, 0x14, 0x13, 0x12, 0x11, 0x10,
-        0x0f, 0x0e, 0x0d, 0x0c, 0x0b, 0x0a, 0x09, 0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01, 0x00,
-        // clang-format on
-    };
-    uint8_t be[CMT_ABI_U256_LENGTH] = {
-        // clang-format off
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
-        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
-        // clang-format on
-    };
-    assert(cmt_abi_decode_uint(be, sizeof(x), x) == 0);
-    assert(memcmp(x, ex, sizeof(ex)) == 0);
-}
-
-static void decode_uint_edom(void) {
-    uint8_t be[CMT_ABI_U256_LENGTH] = {
-        // clang-format off
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xAA, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
-        // clang-format on
-    };
-    {
-        uint8_t x[8] = {0};
-        assert(cmt_abi_decode_uint_nr(be, sizeof(x), x) == -EDOM);
-    }
-
-    {
-        uint8_t x[8] = {0};
-        assert(cmt_abi_decode_uint_nn(be, sizeof(x), x) == -EDOM);
-    }
-
-    {
-        uint8_t x[CMT_ABI_U256_LENGTH + 1] = {0};
-        assert(cmt_abi_decode_uint_nr(be, sizeof(x), x) == -EDOM);
-    }
-
-    {
-        uint8_t x[CMT_ABI_U256_LENGTH + 1] = {0};
-        assert(cmt_abi_decode_uint_nn(be, sizeof(x), x) == -EDOM);
-    }
+static void macro_matches_cmt_abi_funsel(void) {
+    uint32_t funsel = cmt_abi_funsel(0xe6, 0x36, 0xe3, 0x33);
+    assert(funsel == FUNSEL);
 }
 
 static void put_funsel(void) {
@@ -289,16 +110,16 @@ static void put_address(void) {
         0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
         0x01, 0x23, 0x45, 0x67,
     }};
-    cmt_abi_address_t be = {{
+    uint8_t be[] = {
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x23, 0x45, 0x67,
         0x89, 0xab, 0xcd, 0xef, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x01, 0x23, 0x45, 0x67,
-    }};
+    };
     // clang-format on
     CMT_BUF_DECL(b, 64);
     cmt_buf_t it[1] = {*b};
 
     assert(cmt_abi_put_address(it, &x) == 0);
-    assert(memcmp(b->begin, be.data, sizeof(be)) == 0);
+    assert(memcmp(b->begin, be, sizeof(be)) == 0);
 }
 
 static void put_address_enobufs(void) {
@@ -322,25 +143,26 @@ static void put_bytes(void) {
     };
     CMT_BUF_DECL(b, 128);
     cmt_buf_t it[1] = {*b};
-    cmt_buf_t of[1];
-    cmt_buf_t frame[1];
+    cmt_abi_dyn_state_t state;
+    cmt_abi_frame_t frame;
 
-    assert(cmt_abi_mark_frame(it, frame) == 0);
-    assert(cmt_abi_put_bytes_s(it, of) == 0);
-    assert(cmt_abi_put_bytes_d(it, of, frame, &(cmt_abi_bytes_t){sizeof(x), &x}) == 0);
+    assert(cmt_abi_mark_frame(it, &frame) == 0);
+    assert(cmt_abi_put_dyn_head(it, &state, &frame) == 0);
+    assert(cmt_abi_put_dyn_tail(it, &state, 1, cmt_buf_make(sizeof(x), &x)) == 0);
     assert(memcmp(b->begin, be, sizeof(be)) == 0);
 }
 
 static void put_bytes_enobufs(void) {
     uint64_t x = UINT64_C(0x0123456789abcdef);
-    cmt_buf_t of[1];
-    cmt_buf_t frame[1];
+    cmt_abi_dyn_state_t state;
+    cmt_abi_frame_t frame;
 
-    CMT_BUF_DECL(b, 3 * 32 - 1);
+    /* buffer too small for reserve_dyn_tail to have enough space for data */
+    CMT_BUF_DECL(b, (2UL * 32) + sizeof(x) - 1);
     cmt_buf_t it[1] = {*b};
-    assert(cmt_abi_mark_frame(it, frame) == 0);
-    assert(cmt_abi_put_bytes_s(it, of) == 0);
-    assert(cmt_abi_put_bytes_d(it, of, frame, &(cmt_abi_bytes_t){sizeof(x), &x}) == -ENOBUFS);
+    assert(cmt_abi_mark_frame(it, &frame) == 0);
+    assert(cmt_abi_put_dyn_head(it, &state, &frame) == 0);
+    assert(cmt_abi_put_dyn_tail(it, &state, 1, cmt_buf_make(sizeof(x), &x)) == -ENOBUFS);
 }
 
 static void get_funsel(void) {
@@ -486,15 +308,18 @@ static void get_bytes(void) {
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08,
         0xef, 0xcd, 0xab, 0x89, 0x67, 0x45, 0x23, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         // clang-format on
     };
     CMT_BUF_DECL3(b, sizeof(be), be);
+    cmt_abi_frame_t frame = {.range = {{b->begin, b->end}}};
     cmt_buf_t it[1] = {*b};
-    cmt_buf_t of[1];
+    cmt_abi_dyn_state_t state;
     cmt_buf_t bytes[1];
 
-    assert(cmt_abi_get_bytes_s(it, of) == 0);
-    assert(cmt_abi_peek_bytes_d(b, of, bytes) == 0);
+    assert(cmt_abi_get_dyn_head(it, &state, &frame) == 0);
+    assert(cmt_abi_view_dyn_tail(&state, 1, bytes) == 0);
+    assert(cmt_buf_length(*bytes) == sizeof(ex));
     assert(memcmp(bytes->begin, &ex, sizeof(ex)) == 0);
 }
 
@@ -506,56 +331,99 @@ static void get_bytes_enobufs(void) {
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08,
         0xef, 0xcd, 0xab, 0x89, 0x67, 0x45, 0x23, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     };
     // clang-format on
 
-    { // when offset of dynamic reagion failed
-        CMT_BUF_DECL3(b, 1 * CMT_ABI_U256_LENGTH - 1, be);
+    { // buffer too small for offset read
+        CMT_BUF_DECL3(b, CMT_ABI_U256_LENGTH - 1, be);
         cmt_buf_t it[1] = {*b};
-        cmt_buf_t of[1] = {0};
-        cmt_buf_t bytes[1];
+        cmt_abi_frame_t frame = {.range = {{b->begin, b->end}}};
+        cmt_abi_dyn_state_t state;
 
-        assert(cmt_abi_peek_bytes_d(it, of, bytes) == -ENOBUFS);
+        assert(cmt_abi_get_dyn_head(it, &state, &frame) == -ENOBUFS);
     }
 
-    { // dynamic reagion is too small to peek bytes
-        CMT_BUF_DECL3(b, 3 * CMT_ABI_U256_LENGTH - 1, be);
+    { // copy dynamic bytes into adequately-sized buffer
+        CMT_BUF_DECL3(b, 3UL * CMT_ABI_U256_LENGTH, be);
         cmt_buf_t it[1] = {*b};
-        cmt_buf_t of[1] = {0};
-        cmt_buf_t bytes[1];
+        cmt_abi_frame_t frame = {.range = {{b->begin, b->end}}};
+        cmt_abi_dyn_state_t state;
+        uint8_t data[8];
 
-        assert(cmt_abi_get_bytes_s(it, of) == 0);
-        assert(cmt_abi_peek_bytes_d(it, of, bytes) == -ENOBUFS);
+        assert(cmt_abi_get_dyn_head(it, &state, &frame) == 0);
+        assert(cmt_abi_get_dyn_tail(&state, 1, sizeof(data), data) == 0);
     }
 
-    { // dynamic reagion is too small to copy bytes
-        CMT_BUF_DECL3(b, 3 * CMT_ABI_U256_LENGTH - 1, be);
+    { // dynamic region too small to copy: provided buffer too small
+        CMT_BUF_DECL3(b, 3UL * CMT_ABI_U256_LENGTH, be);
         cmt_buf_t it[1] = {*b};
-        cmt_buf_t of[1] = {0};
+        cmt_abi_frame_t frame = {.range = {{b->begin, b->end}}};
+        cmt_abi_dyn_state_t state;
+        uint8_t data[7]; // too small for 8 bytes of data
 
-        size_t n;
-        void *data;
-        assert(cmt_abi_get_bytes_s(it, of) == 0);
-        assert(cmt_abi_get_bytes_d(it, of, &n, &data) == -ENOBUFS);
+        assert(cmt_abi_get_dyn_head(it, &state, &frame) == 0);
+        assert(cmt_abi_get_dyn_tail(&state, 1, sizeof(data), data) == -ENOBUFS);
+    }
+}
+
+static void get_uint_padding_edom(void) {
+    // Non-zero bytes in upper padding must cause EDOM (value doesn't fit)
+    uint8_t be[CMT_ABI_U256_LENGTH] = {
+        // clang-format off
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xAA, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+        // clang-format on
+    };
+    uint8_t x[8] = {0};
+
+    CMT_BUF_DECL3(b, sizeof(be), be);
+    cmt_buf_t rd[1] = {*b};
+
+    // get_uint uses decode_uint which rejects non-zero upper bytes
+    assert(cmt_abi_get_uint(rd, sizeof(x), x) == -EDOM);
+}
+
+static void put_get_bytesN(void) {
+    uint8_t data[4] = {0xde, 0xad, 0xbe, 0xef};
+    uint8_t expected[CMT_ABI_U256_LENGTH] = {0xde, 0xad, 0xbe, 0xef};
+    CMT_BUF_DECL(b, 64);
+    cmt_buf_t wr[1] = {*b};
+
+    // Encode
+    assert(cmt_abi_put_bytesN(wr, 4, data) == 0);
+    assert(memcmp(b->begin, expected, 4) == 0);
+    assert(b->begin[4] == 0x00); // zero-padded
+
+    // Decode
+    cmt_buf_t rd[1] = {*b};
+    uint8_t out[4] = {0};
+    assert(cmt_abi_get_bytesN(rd, 4, out) == 0);
+    assert(memcmp(out, data, 4) == 0);
+}
+
+static void put_get_bytesN_errors(void) {
+    uint8_t buf[16] = {0};
+
+    // n > 32 → EDOM
+    {
+        cmt_buf_t wr[1] = {cmt_buf_make(sizeof(buf), buf)};
+        assert(cmt_abi_put_bytesN(wr, 33, buf) == -EDOM);
+    }
+    {
+        cmt_buf_t rd[1] = {cmt_buf_make(sizeof(buf), buf)};
+        assert(cmt_abi_get_bytesN(rd, 33, buf) == -EDOM);
+    }
+
+    // buffer too small → ENOBUFS
+    {
+        cmt_buf_t wr[1] = {cmt_buf_make(CMT_ABI_U256_LENGTH - 1, buf)};
+        assert(cmt_abi_put_bytesN(wr, 4, buf) == -ENOBUFS);
     }
 }
 
 int main(void) {
-    abi_funsel();
-
-    encode_u8();
-    encode_u16();
-    encode_u32();
-    encode_u64();
-    encode_u256();
-    encode_edom();
-
-    decode_u8();
-    decode_u16();
-    decode_u32();
-    decode_u64();
-    decode_u256();
-    decode_uint_edom();
+    macro_matches_cmt_abi_funsel();
 
     put_funsel();
     put_funsel_enobufs();
@@ -580,6 +448,10 @@ int main(void) {
     get_address_enobufs();
     get_bytes();
     get_bytes_enobufs();
+    get_uint_padding_edom();
+    put_get_bytesN();
+    put_get_bytesN_errors();
 
+    printf("All abi-single tests passed!\n");
     return 0;
 }

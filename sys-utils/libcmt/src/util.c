@@ -1,8 +1,20 @@
+#include "libcmt/util.h"
+
 #include <errno.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+int cmt_util_debug(int rc, const char *expr, const char *file, int line) {
+    if (rc == 0) {
+        return 0;
+    }
+    if (cmt_util_debug_enabled()) {
+        (void) fprintf(stderr, "%s:%d Error %s on `%s'\n", file, line, strerror(-rc), expr);
+    }
+    return rc;
+}
 
 bool cmt_util_debug_enabled(void) {
     static bool checked = false;

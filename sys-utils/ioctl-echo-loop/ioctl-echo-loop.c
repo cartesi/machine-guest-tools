@@ -185,7 +185,7 @@ int main(int argc, char *argv[]) {
     cmt_rollup_t rollup;
     uint64_t advance_index = 0;
 
-    if (cmt_rollup_init(&rollup))
+    if (cmt_rollup_init(&rollup, NULL))
         return EXIT_FAILURE;
 
     struct parsed_args args;

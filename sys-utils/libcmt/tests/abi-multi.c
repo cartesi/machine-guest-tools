@@ -38,7 +38,8 @@ static int memeq(uint8_t *x, uint8_t *y, size_t n, const char *file, int line) {
 }
 
 static int test_request(void) {
-    // cast calldata "Request(address,uint256,uint256,uint256,bytes)" `cast address-zero` 1 2 3 0xdeadbeef | xxd -r -p | xxd -n request -i
+    // cast calldata "Request(address,uint256,uint256,uint256,bytes)" `cast address-zero` 1 2 3 0xdeadbeef | xxd -r -p |
+    // xxd -n request -i
     unsigned char request[] = {
         // clang-format off
         0xf2, 0xbd, 0x3e, 0x8e,
@@ -61,20 +62,20 @@ static int test_request(void) {
     uint8_t mem[256];
     cmt_buf_t bb[1] = {{mem, mem + sizeof mem}};
     cmt_buf_t wr[1] = {*bb};
-    cmt_buf_t of[1];
-    cmt_buf_t frame[1];
 
     cmt_abi_address_t address = {0};
     uint8_t bytes[] = {0xde, 0xad, 0xbe, 0xef};
+    cmt_abi_dyn_state_t state[1];
+    cmt_abi_frame_t frame[1];
 
-    cmt_abi_put_funsel(wr, REQUEST);
-    cmt_abi_mark_frame(wr, frame);
-    cmt_abi_put_address(wr, &address);
-    cmt_abi_put_uint(wr, sizeof(int), &(int[]){1});
-    cmt_abi_put_uint(wr, sizeof(int), &(int[]){2});
-    cmt_abi_put_uint(wr, sizeof(int), &(int[]){3});
-    cmt_abi_put_bytes_s(wr, of);
-    cmt_abi_put_bytes_d(wr, of, frame, &(cmt_abi_bytes_t){sizeof bytes, bytes});
+    assert(cmt_abi_put_funsel(wr, REQUEST) == 0);
+    assert(cmt_abi_mark_frame(wr, frame) == 0);
+    assert(cmt_abi_put_address(wr, &address) == 0);
+    assert(cmt_abi_put_uint(wr, sizeof(int), &(int[]){1}) == 0);
+    assert(cmt_abi_put_uint(wr, sizeof(int), &(int[]){2}) == 0);
+    assert(cmt_abi_put_uint(wr, sizeof(int), &(int[]){3}) == 0);
+    assert(cmt_abi_put_dyn_head(wr, state, frame) == 0);
+    assert(cmt_abi_put_dyn_tail(wr, state, 1, cmt_buf_make(sizeof(bytes), bytes)) == 0);
 
     return sizeof request != (wr->begin - bb->begin) || memeq(request, bb->begin, sizeof request, __FILE__, __LINE__);
 }
@@ -98,23 +99,29 @@ static int test_reply(void) {
     uint8_t mem[256];
     cmt_buf_t bb[1] = {{mem, mem + sizeof mem}};
     cmt_buf_t wr[1] = {*bb};
-    cmt_buf_t of[1];
-    cmt_buf_t frame[1];
 
-    cmt_abi_address_t address = {0};
+    cmt_abi_address_t address[1] = {{{0}}};
     uint8_t bytes[] = {0xde, 0xad, 0xbe, 0xef};
+    cmt_abi_dyn_state_t state[1];
+    cmt_abi_frame_t frame[1];
 
-    cmt_abi_put_funsel(wr, REPLY);
-    cmt_abi_mark_frame(wr, frame);
-    cmt_abi_put_address(wr, &address);
-    cmt_abi_put_bytes_s(wr, of);
-    cmt_abi_put_bytes_d(wr, of, frame, &(cmt_abi_bytes_t){sizeof bytes, bytes});
+    assert(cmt_abi_put_funsel(wr, REPLY) == 0);
+    assert(cmt_abi_mark_frame(wr, frame) == 0);
+    assert(cmt_abi_put_address(wr, address) == 0);
+    assert(cmt_abi_put_dyn_head(wr, state, frame) == 0);
+    assert(cmt_abi_put_dyn_tail(wr, state, 1, cmt_buf_make(sizeof(bytes), bytes)) == 0);
 
     return sizeof reply != (wr->begin - bb->begin) || memeq(reply, bb->begin, sizeof reply, __FILE__, __LINE__);
 }
 
 int main(void) {
+    // exercise memeq mismatch path
+    uint8_t a[] = {0xaa};
+    uint8_t b[] = {0xbb};
+    assert(memeq(a, b, 1, __FILE__, __LINE__) == -1);
+
     assert(test_request() == 0);
     assert(test_reply() == 0);
+    printf("All abi-multi tests passed!\n");
     return 0;
 }

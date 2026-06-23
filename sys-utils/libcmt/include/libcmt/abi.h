@@ -47,7 +47,7 @@
  * [uint](@ref cmt_abi_put_uint), [bool](@ref cmt_abi_put_bool) and
  * [address](@ref cmt_abi_put_address) values are encoded directly in the
  * static section. In addition to those, @b bytes gets an entry in both
- * sections. The static part is done with [this](@ref cmt_abi_put_bytes_s) call.
+ * sections. The static part is done with [this](@ref cmt_abi_put_dyn_head) call.
  *
  * ### Dynamic Section {#dynamic-section}
  *
@@ -56,12 +56,12 @@
  *
  * So types with variable size are encoded in both sections.
  *
- * - `static` section gets some kind of reference / offset to the dynamic section.
+ * - `static` section gets a reference / offset to the dynamic section.
  * - `dynamic` section gets the actual contents
  *
  * In more concrete terms, the @b bytes type is encoded first with a call to @ref
- * cmt_abi_put_bytes_s for its `static` section part and then with a call to
- * @ref cmt_abi_put_bytes_d for its `dynamic` section part.
+ * cmt_abi_put_dyn_head for its `static` section part and then with a call to
+ * @ref cmt_abi_put_dyn_tail for its `dynamic` section part.
  *
  * ## Encoder
  *
@@ -74,25 +74,35 @@
  *
  * @includelineno "examples/abi_encode_001.c"
  *
- * For multiple values in the dynamic section, do them in order.
+ * For multiple dynamic values, do the "heads" first, then the "tails" as
+ * described in the solidity specification.
  *
  * @includelineno "examples/abi_encode_002.c"
  *
  * ## Decoder
  *
- * Lets look at code that decodes the examples above. We'll _check_ instead of
- * _put_ for funsel. And _get_ instead _put_ for most of everything else.
+ * Lets look at code that decodes the examples above. In this case we can
+ * choose one of _get_ or _check_ funsel calls. _get_ is for retrieving the
+ * encoded value. While _check_ is more adequate in this case. We passes in a
+ * known value that must match what is in the buffer. After that we retrive
+ * the address for later processing.
  *
  * @includelineno "examples/abi_decode_000.c"
  *
- * Retrieving @b bytes is a bit different since the API doesn't do dynamic
- * memory allocation. @b data points inside the @p rd buffer itself, into its
- * dynamic section. This makes the API very lightweight and fast but requires
- * care in its usage. If @p rd gets free'd or reused while there is still a
- * reference to @p data, we'll get memory corruption. If in doublt create a
- * copy of @p data and use it instead.
+ * There are two options when dealing with bytes. _get_ a copy of the contents
+ * into a user provided buffer. And _view_ to retrieve pointers into the
+ * underlying @p rx buffer. This makes the API very lightweight and fast but
+ * requires care in its usage. If @p rx gets free'd or reused while there is
+ * still a reference to @p data, we'll get memory corruption. For the rollup
+ * API, the buffer contents reset for new inputs. If in doublt create a copy of
+ * @p data and use it instead.
  *
  * @includelineno "examples/abi_decode_001.c"
+ *
+ * For multiple dynamic values, do the "heads" first, then the "tails" as
+ * described in the solidity specification. Similar to the encoding process.
+ *
+ * @includelineno "examples/abi_decode_002.c"
  *
  * ## Complete
  *
@@ -139,10 +149,21 @@ typedef struct cmt_abi_u256 {
     uint8_t data[CMT_ABI_U256_LENGTH];
 } cmt_abi_u256_t;
 
-typedef struct cmt_abi_bytes {
-    size_t length;
-    void *data;
-} cmt_abi_bytes_t;
+/** EVM bytes32 */
+typedef struct cmt_abi_bytes32 {
+    uint8_t data[CMT_ABI_U256_LENGTH];
+} cmt_abi_bytes32_t;
+
+typedef struct cmt_abi_frame {
+    cmt_buf_t range[1];
+} cmt_abi_frame_t;
+
+/** Helper struct for encodings that require a dynamic section  */
+typedef struct cmt_abi_dyn_state {
+    cmt_abi_frame_t frame[1];
+    cmt_buf_t offset[1];
+    cmt_buf_t length[1];
+} cmt_abi_dyn_state_t;
 
 /** Create a function selector from an array of bytes
  * @param [in] funsel function selector bytes
@@ -150,9 +171,9 @@ typedef struct cmt_abi_bytes {
  * - function selector converted to big endian (as expected by EVM) */
 uint32_t cmt_abi_funsel(uint8_t a, uint8_t b, uint8_t c, uint8_t d);
 
-/** Create a frame for the dynamic section. Read the EVM ABI for the details
- * @param [in] me     reader or writer buffer
- * @param [out] frame start of the parameters frame
+/** Create a frame for the dynamic section. Read the EVM ABI for the details.
+ * @param [in]  me     reader or writer buffer
+ * @param [out] frame  start of the parameters frame
  *
  * @return
  * |   |                             |
@@ -160,13 +181,13 @@ uint32_t cmt_abi_funsel(uint8_t a, uint8_t b, uint8_t c, uint8_t d);
  * |  0| success                     |
  * |< 0| failure with a -errno value |
  */
-int cmt_abi_mark_frame(const cmt_buf_t *me, cmt_buf_t *frame);
+int cmt_abi_mark_frame(const cmt_buf_t *me, cmt_abi_frame_t *frame);
 
 // put section ---------------------------------------------------------------
 
-/** Encode a function selector into the buffer @p me
+/** Encode a function selector into the buffer @p wr.
  *
- * @param [in,out] me     a initialized buffer working as iterator
+ * @param [in,out] wr     a initialized buffer working as iterator
  * @param [in]     funsel function selector
  *
  * @return
@@ -177,12 +198,12 @@ int cmt_abi_mark_frame(const cmt_buf_t *me, cmt_buf_t *frame);
  *
  * @note A function selector can be compute it with: @ref cmt_keccak_funsel.
  * It is always represented in big endian. */
-int cmt_abi_put_funsel(cmt_buf_t *me, uint32_t funsel);
+int cmt_abi_put_funsel(cmt_buf_t *wr, uint32_t funsel);
 
 /** Encode a native endianness unsigned integer of up to 32bytes of data into
  * the buffer
  *
- * @param [in,out] me   a initialized buffer working as iterator
+ * @param [in,out] wr   a initialized buffer working as iterator
  * @param [in]     n    size of @p data in bytes
  * @param [in]     data pointer to a integer
  *
@@ -190,7 +211,7 @@ int cmt_abi_put_funsel(cmt_buf_t *me, uint32_t funsel);
  * |        |                                          |
  * |-------:|------------------------------------------|
  * |       0| success                                  |
- * |-ENOBUFS| no space left in @p me                   |
+ * |-ENOBUFS| no space left in @p wr                   |
  * |   -EDOM| integer not representable in @p 32 bytes |
  *
  *
@@ -201,12 +222,12 @@ int cmt_abi_put_funsel(cmt_buf_t *me, uint32_t funsel);
  * cmt_abi_put_uint(&it, sizeof x, &x);
  * ...
  * @endcode */
-int cmt_abi_put_uint(cmt_buf_t *me, size_t data_length, const void *data);
+int cmt_abi_put_uint(cmt_buf_t *wr, size_t length, const void *data);
 
 /** Encode a big endian unsigned integer of up to 32bytes of data into the
  * buffer
  *
- * @param [in,out] me     a initialized buffer working as iterator
+ * @param [in,out] wr     a initialized buffer working as iterator
  * @param [in]     length size of @p data in bytes
  * @param [in]     data   pointer to a integer
  *
@@ -214,7 +235,7 @@ int cmt_abi_put_uint(cmt_buf_t *me, size_t data_length, const void *data);
  * |        |                                                   |
  * |-------:|---------------------------------------------------|
  * |       0| success                                           |
- * |-ENOBUFS| no space left in @p me                            |
+ * |-ENOBUFS| no space left in @p wr                            |
  * |   -EDOM| integer not representable in @p data_length bytes |
  *
  * @code
@@ -237,30 +258,47 @@ int cmt_abi_put_uint(cmt_buf_t *me, size_t data_length, const void *data);
  * cmt_abi_put_uint(&it, sizeof big, &big);
  * @endcode
  * @note This function takes care of endianness conversions */
-int cmt_abi_put_uint_be(cmt_buf_t *me, size_t data_length, const void *data);
+int cmt_abi_put_uint_be(cmt_buf_t *wr, size_t length, const void *data);
 
 /** Encode a @ref cmt_abi_u256_t into the buffer
  *
- * @param [in,out] me     a initialized buffer working as iterator
+ * @param [in,out] wr     a initialized buffer working as iterator
  * @param [in]     data   pointer to a @ref cmt_abi_u256_t
  *
  * @return
  * |        |                                                   |
  * |-------:|---------------------------------------------------|
  * |       0| success                                           |
- * |-ENOBUFS| no space left in @p me                            | */
-int cmt_abi_put_uint256(cmt_buf_t *me, const cmt_abi_u256_t *value);
+ * |-ENOBUFS| no space left in @p wr                            | */
+int cmt_abi_put_uint256(cmt_buf_t *wr, const cmt_abi_u256_t *value);
+
+/** Encode a fixed-size byte array (left-aligned, padded to 32 bytes).
+ *
+ * This is the encoding for Solidity's bytes<M> type where M ≤ 32.
+ * Unlike integers which are right-aligned, bytes<M> is left-aligned.
+ *
+ * @param [in,out] wr    initialized buffer
+ * @param [in]     n     number of bytes (1 ≤ n ≤ CMT_ABI_U256_LENGTH)
+ * @param [in]     data  pointer to the byte array
+ *
+ * @return
+ * |        |                        |
+ * |-------:|------------------------|
+ * |       0| success                |
+ * |   -EDOM| n > 32                 |
+ * |-ENOBUFS| no space left in @p wr | */
+int cmt_abi_put_bytesN(cmt_buf_t *wr, size_t n, const void *data);
 
 /** Encode a bool into the buffer
  *
- * @param [in,out] me    a initialized buffer working as iterator
+ * @param [in,out] wr    a initialized buffer working as iterator
  * @param [in]     value boolean value
  *
  * @return
  * |        |                        |
  * |-------:|------------------------|
  * |       0| success                |
- * |-ENOBUFS| no space left in @p me |
+ * |-ENOBUFS| no space left in @p wr |
  *
  * @code
  * ...
@@ -269,57 +307,43 @@ int cmt_abi_put_uint256(cmt_buf_t *me, const cmt_abi_u256_t *value);
  * ...
  * @endcode
  * @note This function takes care of endianness conversions */
-int cmt_abi_put_bool(cmt_buf_t *me, bool value);
+int cmt_abi_put_bool(cmt_buf_t *wr, bool value);
 
 /** Encode @p address (exactly @ref CMT_ABI_ADDRESS_LENGTH bytes) into the buffer
  *
- * @param [in,out] me      initialized buffer
+ * @param [in,out] wr      initialized buffer
  * @param [in]     address a value of type @ref cmt_abi_address_t
  *
  * @return
  * |        |                        |
  * |-------:|------------------------|
  * |       0| success                |
- * |-ENOBUFS| no space left in @p me | */
-int cmt_abi_put_address(cmt_buf_t *me, const cmt_abi_address_t *address);
+ * |-ENOBUFS| no space left in @p wr | */
+int cmt_abi_put_address(cmt_buf_t *wr, const cmt_abi_address_t *address);
 
-/** Encode the static part of @b bytes into the message,
- * used in conjunction with @ref cmt_abi_put_bytes_d
+/** Encode the static part (head) of dynamically sized value,
+ * bytes/strings/arrays. Used in conjunction with @ref cmt_abi_put_dyn_tail,
+ * @ref cmt_abi_reserve_dyn_tail and @ref cmt_abi_commit_dyn_tail
  *
- * @param [in,out] me     initialized buffer
- * @param [out]    offset initialize for @ref cmt_abi_put_bytes_d
+ * @param [in,out] wr     initialized buffer
+ * @param [out]    state  uninitialized helper struct
+ * @param [in]     frame  initialized frame, usually after funsel
  *
  * @return
  * |        |                        |
  * |-------:|------------------------|
  * |       0| success                |
- * |-ENOBUFS| no space left in @p me | */
-int cmt_abi_put_bytes_s(cmt_buf_t *me, cmt_buf_t *offset);
+ * |-ENOBUFS| no space left in @p wr | */
+int cmt_abi_put_dyn_head(cmt_buf_t *wr, cmt_abi_dyn_state_t *state, cmt_abi_frame_t *frame);
 
-/** Encode the dynamic part of @b bytes into the message,
- * used in conjunction with @ref cmt_abi_put_bytes_d
+/** Reserve all unused space at the end of @p wr encoder.
  *
- * @param [in,out] me     initialized buffer
- * @param [in]     offset initialized from @ref cmt_abi_put_bytes_h
- * @param [in]     n      size of @b data
- * @param [in]     data   array of bytes
- * @param [in]     start  starting point for offset calculation (first byte after funsel)
+ * Then encodes the dynamic item,
+ * then commits the space used with @ref cmt_abi_commit_dyn_tail.
  *
- * @return
- * |        |                        |
- * |-------:|------------------------|
- * |       0| success                |
- * |-ENOBUFS| no space left in @p me | */
-//int cmt_abi_put_bytes_d(cmt_buf_t *me, cmt_buf_t *offset, size_t n, const void *data, const void *start);
-int cmt_abi_put_bytes_d(cmt_buf_t *me, cmt_buf_t *offset, const cmt_buf_t *frame, const cmt_abi_bytes_t *payload);
-
-/** Reserve @b n bytes of data from the buffer into @b res to be filled by the
- * caller
- *
- * @param [in,out] me     initialized buffer
- * @param [in]     n      amount of bytes to reserve
- * @param [out]    res    slice of bytes extracted from @p me
- * @param [in]     start  starting point for offset calculation (first byte after funsel)
+ * @param [in,out] wr        initialized buffer
+ * @param [in]     state     initialized helper struct
+ * @param [out]    available slice of bytes at end of @p wr
  *
  * @return
  * |        |                        |
@@ -327,9 +351,54 @@ int cmt_abi_put_bytes_d(cmt_buf_t *me, cmt_buf_t *offset, const cmt_buf_t *frame
  * |       0| success                |
  * |-ENOBUFS| no space left in @p me |
  *
- * @note @p me must outlive @p res.
- * Create a duplicate otherwise */
-int cmt_abi_reserve_bytes_d(cmt_buf_t *me, cmt_buf_t *of, size_t n, cmt_buf_t *out, const void *start);
+ * @note: @p available must outlive @p wr
+ */
+int cmt_abi_reserve_dyn_tail(cmt_buf_t *wr, cmt_abi_dyn_state_t *state, cmt_buf_t *available);
+
+/** Commit previously reserved dynamic tail space after writing `count` items
+ * of data, each `size` bytes long, to the buffer obtained from a previous
+ * @ref cmt_abi_reserve_dyn_tail call.
+ *
+ * @param [in,out] wr         initialized writer buffer; its cursor is advanced
+ *                            by the total committed size (including 32-byte
+ *                            padding)
+ * @param [in]     state      helper struct initialized by @ref
+ *                            cmt_abi_put_dyn_head or @ref cmt_abi_reserve_dyn_tail;
+ *                            must not be modified between reservation and commit
+ * @param [in]     size       size in bytes of each item (1 for bytes/strings,
+ *                            32 for uint256, etc.); total data size is
+ *                            @p size * @p count
+ * @param [in]     count      number of items of @p size bytes each; the data
+ *                            for these items must have been written to the
+ *                            buffer obtained from @ref cmt_abi_reserve_dyn_tail
+ *
+ * @return
+ * |        |                        |
+ * |-------:|------------------------|
+ * |       0| success                |
+ * |-EINVAL | invalid arguments        |
+ * |-ENOBUFS| no space left in @p wr |
+ *
+ * NOTE: Consider using @ref cmt_abi_put_dyn_tail if the length is already known.
+ */
+int cmt_abi_commit_dyn_tail(cmt_buf_t *wr, cmt_abi_dyn_state_t *state, size_t size, size_t count);
+
+/** Encode the contents of @p data as a dynamic array into the message.
+ * The element count @c n is derived as @c cmt_buf_length(data)/size .
+ *
+ * Combination @ref cmt_abi_reserve_dyn + @ref memcpy + @ref cmt_abi_commit_dyn
+ *
+ * @param [in,out] wr         initialized buffer
+ * @param [in,out] state      initialized helper struct
+ * @param [in]     size       size in bytes of each item (1 for bytes/strings, 32 for uint256, etc.)
+ * @param [in]     data       buffer whose contents are copied to the dynamic tail
+ *
+ * @return
+ * |        |                        |
+ * |-------:|------------------------|
+ * |       0| success                |
+ * |-ENOBUFS| no space left in @p me | */
+int cmt_abi_put_dyn_tail(cmt_buf_t *wr, cmt_abi_dyn_state_t *state, size_t size, cmt_buf_t data);
 
 // get section ---------------------------------------------------------------
 
@@ -344,7 +413,7 @@ int cmt_abi_reserve_bytes_d(cmt_buf_t *me, cmt_buf_t *of, size_t n, cmt_buf_t *o
  *
  * @code
  * ...
- * if (cmt_buf_length(it) < 4)
+ * if (cmt_buf_length(*it) < 4)
  * 	return EXIT_FAILURE;
  * switch (cmt_abi_peek_funsel(it) {
  * case CMT_ABI_FUNSEL(...): // known type, try to parse it
@@ -370,19 +439,35 @@ int cmt_abi_check_funsel(cmt_buf_t *me, uint32_t expected);
 
 /** Decode a @ref cmt_abi_u256_t from the buffer
  *
- * @param [in,out] me     initialized buffer
+ * @param [in,out] rd     initialized buffer
  * @param [out]    data   value of type @ref cmt_abi_u256_t
  *
  * @return
  * |        |                                                   |
  * |-------:|---------------------------------------------------|
  * |       0| success                                           |
- * |-ENOBUFS| no space left in @p me                            | */
-int cmt_abi_get_uint256(cmt_buf_t *me, cmt_abi_u256_t *value);
+ * |-ENOBUFS| no space left in @p rd                            | */
+int cmt_abi_get_uint256(cmt_buf_t *rd, cmt_abi_u256_t *value);
+
+/** Decode a fixed-size byte array from ABI format.
+ *
+ * Reads 32 bytes from the buffer and copies the first @p n bytes to @p data.
+ *
+ * @param [in,out] rd    initialized buffer
+ * @param [in]     n     number of bytes to extract (1 ≤ n ≤ 32)
+ * @param [out]    data  pointer to output byte array
+ *
+ * @return
+ * |        |                        |
+ * |-------:|------------------------|
+ * |       0| success                |
+ * |   -EDOM| n > 32                 |
+ * |-ENOBUFS| no space left in @p rd | */
+int cmt_abi_get_bytesN(cmt_buf_t *rd, size_t n, void *data);
 
 /** Decode a unsigned integer of up to 32bytes, in native endianness, from the buffer
  *
- * @param [in,out] me     initialized buffer
+ * @param [in,out] rd     initialized buffer
  * @param [in]     n      size of @p data in bytes
  * @param [out]    data   pointer to a integer
  *
@@ -390,13 +475,13 @@ int cmt_abi_get_uint256(cmt_buf_t *me, cmt_abi_u256_t *value);
  * |        |                                                   |
  * |-------:|---------------------------------------------------|
  * |       0| success                                           |
- * |-ENOBUFS| no space left in @p me                            |
+ * |-ENOBUFS| no space left in @p rd                            |
  * |   -EDOM| integer not representable in @p data_length bytes | */
-int cmt_abi_get_uint(cmt_buf_t *me, size_t n, void *data);
+int cmt_abi_get_uint(cmt_buf_t *rd, size_t n, void *data);
 
 /** Decode @p length big-endian bytes, up to 32, from the buffer into @p data
  *
- * @param [in,out] me     initialized buffer
+ * @param [in,out] rd     initialized buffer
  * @param [in]     length size of @p data in bytes
  * @param [out]    data   pointer to a integer
  *
@@ -404,20 +489,20 @@ int cmt_abi_get_uint(cmt_buf_t *me, size_t n, void *data);
  * |        |                                                   |
  * |-------:|---------------------------------------------------|
  * |       0| success                                           |
- * |-ENOBUFS| no space left in @p me                            |
+ * |-ENOBUFS| no space left in @p rd                            |
  * |   -EDOM| integer not representable in @p data_length bytes | */
-int cmt_abi_get_uint_be(cmt_buf_t *me, size_t n, void *data);
+int cmt_abi_get_uint_be(cmt_buf_t *rd, size_t n, void *data);
 
 /** Consume and decode a bool from the buffer
  *
- * @param [in,out] me    a initialized buffer working as iterator
+ * @param [in,out] rd    a initialized buffer working as iterator
  * @param [out]    value boolean value
  *
  * @return
  * |        |                        |
  * |-------:|------------------------|
  * |       0| success                |
- * |-ENOBUFS| no space left in @p me |
+ * |-ENOBUFS| no space left in @p rd |
  *
  * @code
  * ...
@@ -428,151 +513,64 @@ int cmt_abi_get_uint_be(cmt_buf_t *me, size_t n, void *data);
  * ...
  * @endcode
  * @note This function takes care of endianness conversions */
-int cmt_abi_get_bool(cmt_buf_t *me, bool *value);
+int cmt_abi_get_bool(cmt_buf_t *rd, bool *value);
 
 /** Consume and decode @b address from the buffer
  *
- * @param [in,out] me      initialized buffer
+ * @param [in,out] rd      initialized buffer
  * @param [out]    address value of type @ref cmt_abi_address_t
  *
  * @return
  * |        |                        |
  * |-------:|------------------------|
  * |       0| success                |
- * |-ENOBUFS| no space left in @p me | */
-int cmt_abi_get_address(cmt_buf_t *me, cmt_abi_address_t *value);
+ * |-ENOBUFS| no space left in @p rd | */
+int cmt_abi_get_address(cmt_buf_t *rd, cmt_abi_address_t *address);
 
-/** Consume and decode the offset @p of
+/** Consume and decode the offset of the dynamic value
  *
- * @param [in,out] me initialized buffer
- * @param [out]    of offset to @p bytes data, for use in conjunction with @ref cmt_abi_get_bytes_d
+ * @param [in,out] rd     initialized buffer
+ * @param [out]    state  uninitialized dynamic state
+ * @param [in]     frame  initialized frame, usually after funsel
  *
  * @return
  * |        |                        |
  * |-------:|------------------------|
  * |       0| success                |
- * |-ENOBUFS| no space left in @p me | */
-int cmt_abi_get_bytes_s(cmt_buf_t *me, cmt_buf_t of[1]);
+ * |-ENOBUFS| no space left in @p rd | */
+int cmt_abi_get_dyn_head(cmt_buf_t *rd, cmt_abi_dyn_state_t *state, cmt_abi_frame_t *frame);
 
-/** Decode @b bytes from the buffer by taking a pointer to its contents.
+/** Create a view into `data`, encoded in a buffer. The `size` in bytes of each
+ * item must be known and provided, `n` (the count) is computed from it and returned in `n`.
  *
- * @param [in]  start initialized buffer (from the start after funsel)
- * @param [out]    of    offset to @p bytes data
- * @param [out]    n     amount of data available in @b bytes
- * @param [out]    data memory range with contents
+ * @param [in]  state      initialized dynamic state
+ * @param [in]  size       size in bytes of each item (1 for bytes/strings, 32 for uint256, etc.)
+ * @param [out] data       memory range with contents
  *
  * @return
- * |        |                        |
- * |-------:|------------------------|
- * |       0| success                |
- * |-ENOBUFS| no space left in @p me |
+ * |        |                             |
+ * |-------:|-----------------------------|
+ * |       0| success                     |
+ * |     < 0| failure with a -errno value |
  *
- * @note @p of can be initialized by calling @ref cmt_abi_get_bytes_s */
-int cmt_abi_get_bytes_d(const cmt_buf_t *start, cmt_buf_t of[1], size_t *n, void **data);
+ * @note @p state can be initialized by calling @ref cmt_abi_get_dyn_head */
+int cmt_abi_view_dyn_tail(cmt_abi_dyn_state_t *state, size_t size, cmt_buf_t *data);
 
-/** Decode @b bytes from the buffer by taking a pointer to its contents.
+/** Copy @b bytes from the buffer into the user provided buffer
  *
- * @param [in]  start initialized buffer (from the start after funsel)
- * @param [out] of    offset to @p bytes data
- * @param [out] n     amount of data available in @b bytes
- * @param [out] bytes memory range with contents
+ * @param [in]  state      initialized dynamic state
+ * @param [in]  size       size in bytes of each item (1 for bytes/strings, 32 for uint256, etc.)
+ * @param [in]  max        capacity of @p data in bytes. Fails with `-ENOBUFS` if `size x n` exceeds this limit.
+ * @param [out] data       pre-allocated buffer
  *
  * @return
- * |        |                        |
- * |-------:|------------------------|
- * |       0| success                |
- * |-ENOBUFS| no space left in @p me |
- *
- * @note @p of can be initialized by calling @ref cmt_abi_get_bytes_s */
-int cmt_abi_peek_bytes_d(const cmt_buf_t *start, cmt_buf_t of[1], cmt_buf_t *bytes);
-
-// raw codec section --------------------------------------------------------
-
-/** Encode @p n bytes of @p data into @p out (up to 32).
- *
- * @param [in]  n    size of @p data in bytes
- * @param [in]  data integer value to encode into @p out
- * @param [out] out  encoded result
- *
- * @return
- * |        |                                                   |
- * |-------:|---------------------------------------------------|
- * |       0| success                                           |
- * |   -EDOM| integer not representable in @p data_length bytes | */
-int cmt_abi_encode_uint(size_t n, const void *data, uint8_t out[CMT_ABI_U256_LENGTH]);
-
-/** Encode @p n bytes of @p data into @p out (up to 32) in reverse order.
- *
- * @param [in]  n    size of @p data in bytes
- * @param [in]  data integer value to encode into @p out
- * @param [out] out  encoded result
- *
- * @return
- * |        |                                                   |
- * |-------:|---------------------------------------------------|
- * |       0| success                                           |
- * |   -EDOM| integer not representable in @p data_length bytes |
- *
- * @note use @ref cmt_abi_encode_uint instead */
-int cmt_abi_encode_uint_nr(size_t n, const uint8_t *data, uint8_t out[CMT_ABI_U256_LENGTH]);
-
-/** Encode @p n bytes of @p data into @p out (up to 32) in normal order.
- *
- * @param [in]  n    size of @p data in bytes
- * @param [in]  data integer value to encode into @p out
- * @param [out] out  encoded result
- *
- * @return
- * |        |                                                   |
- * |-------:|---------------------------------------------------|
- * |       0| success                                           |
- * |   -EDOM| integer not representable in @p data_length bytes |
- *
- * @note use @ref cmt_abi_encode_uint instead */
-int cmt_abi_encode_uint_nn(size_t n, const uint8_t *data, uint8_t out[CMT_ABI_U256_LENGTH]);
-
-/** Decode @p n bytes of @p data into @p out (up to 32).
- *
- * @param [in]  data integer value to decode into @p out
- * @param [in]  n    size of @p data in bytes
- * @param [out] out  decoded output
- *
- * @return
- * |        |                                                   |
- * |-------:|---------------------------------------------------|
- * |       0| success                                           |
- * |   -EDOM| integer not representable in @p data_length bytes | */
-int cmt_abi_decode_uint(const uint8_t data[CMT_ABI_U256_LENGTH], size_t n, uint8_t *out);
-
-/** Decode @p n bytes of @p data into @p out (up to 32) in reverse order.
- *
- * @param [in]  data integer value to decode into @p out
- * @param [in]  n    size of @p data in bytes
- * @param [out] out  decoded output
- *
- * @return
- * |        |                                                   |
- * |-------:|---------------------------------------------------|
- * |       0| success                                           |
- * |   -EDOM| integer not representable in @p data_length bytes |
- *
- * @note if in doubt, use @ref cmt_abi_decode_uint */
-int cmt_abi_decode_uint_nr(const uint8_t data[CMT_ABI_U256_LENGTH], size_t n, uint8_t *out);
-
-/** Decode @p n bytes of @p data into @p out (up to 32) in normal order.
- *
- * @param [in]  data integer value to decode into @p out
- * @param [in]  n    size of @p data in bytes
- * @param [out] out  decoded output
- *
- * @return
- * |        |                                                   |
- * |-------:|---------------------------------------------------|
- * |       0| success                                           |
- * |   -EDOM| integer not representable in @p data_length bytes |
- *
- * @note if in doubt, use @ref cmt_abi_decode_uint */
-int cmt_abi_decode_uint_nn(const uint8_t data[CMT_ABI_U256_LENGTH], size_t n, uint8_t *out);
+ * |        |                             |
+ * |-------:|-----------------------------|
+ * |       0| success                     |
+ * |-ENOBUFS| `data` buffer is too small  |
+ * |     < 0| failure with a -errno value |
+ */
+int cmt_abi_get_dyn_tail(cmt_abi_dyn_state_t *state, size_t size, size_t max, void *data);
 
 #endif /* CMT_ABI_H */
 /** @} */

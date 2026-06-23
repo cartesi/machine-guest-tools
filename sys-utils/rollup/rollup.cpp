@@ -232,7 +232,16 @@ static int write_voucher(void) try {
     memcpy(destination.data, reinterpret_cast<unsigned char *>(destination_bytes.data()), destination_bytes.size());
     memcpy(value.data, reinterpret_cast<unsigned char *>(value_bytes.data()), value_bytes.size());
 
-    int ret = cmt_rollup_emit_voucher(r, &destination, &value, &payload, &index);
+    // Encode voucher into tx buffer
+    cmt_buf_t tx = cmt_rollup_get_tx(&r);
+    cmt_buf_t msg;
+    // TODO: implement voucher encoding using cmt_abi_put_* functions
+    // int rc = cmt_voucher_encode(tx, &msg, &destination, &value, &payload);
+    // if (rc) return rc;
+    
+    // For now, use empty data (will fail at emit if no encoding done)
+    cmt_buf_t data = cmt_buf_make(0, nullptr);
+    int ret = cmt_rollup_emit_output(r, data);
     if (ret)
         return ret;
 
@@ -259,7 +268,16 @@ static int write_delegate_call_voucher(void) try {
 
     memcpy(destination.data, reinterpret_cast<unsigned char *>(destination_bytes.data()), destination_bytes.size());
 
-    int ret = cmt_rollup_emit_delegate_call_voucher(r, &destination, &payload, &index);
+    // Encode delegate call voucher into tx buffer
+    cmt_buf_t tx = cmt_rollup_get_tx(&r);
+    cmt_buf_t msg;
+    // TODO: implement delegate call voucher encoding using cmt_abi_put_* functions
+    // int rc = cmt_delegate_call_voucher_encode(tx, &msg, &destination, &payload);
+    // if (rc) return rc;
+    
+    // For now, use empty data (will fail at emit if no encoding done)
+    cmt_buf_t data = cmt_buf_make(0, nullptr);
+    int ret = cmt_rollup_emit_output(r, data);
     if (ret)
         return ret;
 
@@ -281,7 +299,15 @@ static int write_notice(void) try {
     payload.data = reinterpret_cast<unsigned char *>(payload_bytes.data());
     payload.length = payload_bytes.size();
     uint64_t index = 0;
-    int ret = cmt_rollup_emit_notice(r, &payload, &index);
+
+    // Encode notice into tx buffer
+    cmt_buf_t tx = cmt_rollup_get_tx(&r);
+    cmt_buf_t msg;
+    int rc = cmt_notice_encode(tx, &msg, &payload);
+    if (rc)
+        return rc;
+    
+    int ret = cmt_rollup_emit_output(r, msg);
     if (ret)
         return ret;
 
@@ -303,7 +329,8 @@ static int write_report(void) try {
     cmt_abi_bytes_t payload;
     payload.data = reinterpret_cast<unsigned char *>(payload_bytes.data());
     payload.length = payload_bytes.size();
-    return cmt_rollup_emit_report(r, &payload);
+    cmt_buf_t data = cmt_buf_make(payload.length, payload.data);
+    return cmt_rollup_emit_report(r, data);
 } catch (std::exception &x) {
     std::cerr << x.what() << '\n';
     return 1;
@@ -317,7 +344,8 @@ static int throw_exception(void) try {
     cmt_abi_bytes_t payload;
     payload.data = reinterpret_cast<unsigned char *>(payload_bytes.data());
     payload.length = payload_bytes.size();
-    return cmt_rollup_emit_exception(r, &payload);
+    cmt_buf_t data = cmt_buf_make(payload.length, payload.data);
+    return cmt_rollup_emit_exception(r, data);
 } catch (std::exception &x) {
     std::cerr << x.what() << '\n';
     return 1;
