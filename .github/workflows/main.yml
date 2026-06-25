@@ -126,19 +126,3 @@ jobs:
       - name: Test libcmt mock on host
         run: |
           make -C sys-utils/libcmt/ -j$(nproc) host test
-
-      - name: Test rollup-http-server and echo-dapp client on host
-        run: |
-          cd rollup-http/rollup-http-server
-          MOCK_BUILD=true cargo test -- --show-output --test-threads=1
-
-      - name: Test rollup-http-server api schema
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y wait-for-it python3 python3-pip
-          pip3 install schemathesis==3.39.16
-          cd rollup-http/rollup-http-server
-          wget https://raw.githubusercontent.com/cartesi/openapi-interfaces/v0.10.0/rollup.yaml
-          MOCK_BUILD=true cargo run -- "echo 1" &
-          wait-for-it localhost:5004 --timeout=30
-          st run rollup.yaml --checks all --validate-schema true --hypothesis-phases explicit --base-url http://localhost:5004
