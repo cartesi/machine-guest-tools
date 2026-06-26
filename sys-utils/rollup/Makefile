@@ -18,7 +18,7 @@ PREFIX   ?= /usr
 CXX      := $(TOOLCHAIN_PREFIX)g++
 CXXFLAGS += -Wall -Wextra -pedantic -O2 -std=c++20 -I../libcmt/include
 LDFLAGS  += -L../libcmt/build/riscv64 -l:libcmt.a
-LDFLAGS_MOCK  += -L../libcmt/build/build -l:libcmt.a
+LDFLAGS_MOCK  += -L../libcmt/build/mock -l:libcmt.a
 
 all: rollup
 
@@ -26,10 +26,13 @@ rollup: rollup.cpp
 	$(CXX) $(CXXFLAGS) -o $@ $< $(LDFLAGS)
 
 rollup-mock: rollup.cpp
-	$(CXX) $(CXXFLAGS) -o $@ $< $(LDFLAGS_BUILD)
+	$(CXX) $(CXXFLAGS) -o $@ $< $(LDFLAGS_MOCK)
 
 install: rollup
 	install -Dm755 rollup $(DESTDIR)$(PREFIX)/bin/rollup
+
+test: rollup-mock
+	sh rollup-mock-test.sh
 
 clean:
 	@rm -f rollup

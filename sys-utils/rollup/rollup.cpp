@@ -15,11 +15,12 @@
 //
 
 #include <cstdint>
+#include <cstdlib>
+#include <errno.h>
 #include <iostream>
 #include <iterator>
 #include <sstream>
 #include <string>
-#include <errno.h>
 
 #include <fcntl.h>
 #include <stdbool.h>
@@ -27,6 +28,7 @@
 #include <unistd.h>
 
 extern "C" {
+#include "libcmt/codec.h"
 #include "libcmt/rollup.h"
 };
 
@@ -35,19 +37,23 @@ extern "C" {
 // RAII file descriptor implementation
 class rollup {
 public:
-    rollup(bool load_merkle = true) {
-        if (cmt_rollup_init(&m_rollup))
+    rollup(bool load_merkle = true) : rollup(NULL, load_merkle) {}
+    rollup(cmt_buf_t *tx, bool load_merkle = true) {
+        if (cmt_rollup_init(&m_rollup, tx))
             throw std::system_error(errno, std::generic_category(),
                 "Unable to initialize. Try runnning again with CMT_DEBUG=yes'");
         if (load_merkle)
-            cmt_rollup_load_merkle(&m_rollup, "/tmp/merkle.dat");
+            cmt_merkle_load(cmt_rollup_get_merkle(&m_rollup), "/tmp/merkle.dat");
     }
     ~rollup() {
-        cmt_rollup_save_merkle(&m_rollup, "/tmp/merkle.dat");
+        cmt_merkle_save(cmt_rollup_get_merkle(&m_rollup), "/tmp/merkle.dat");
         cmt_rollup_fini(&m_rollup);
     }
     operator cmt_rollup_t *(void) {
         return &m_rollup;
+    }
+    uint64_t get_leaf_count(void) {
+        return cmt_merkle_get_leaf_count(cmt_rollup_get_merkle(&m_rollup));
     }
 
 private:
@@ -62,30 +68,86 @@ static void print_help(void) {
 
   where [command] is one of
 
-    voucher
-      emit a voucher read from stdin as a JSON object in the format
-        {"destination": <address>, "value": <hex-uint256>, "payload": <hex-data>}
+    call-voucher
+      emit a call voucher read from stdin as a JSON object in the format
+        {
+            "destination": <address>,
+            "value": <hex-uint256>,
+            "payload": <hex-data>,
+            "app_context": <hex-uint256>
+        }
       where
         <address> contains a 20-byte EVM address in hex,
         <hex-uint256> contains a big-endian 32-byte unsigned integer in hex, and
         <hex-data> contains arbitrary data in hex
       if successful, prints to stdout a JSON object in the format
         {"index": <number> }
-      where field "index" is the index allocated for the voucher
+      where field "index" is the index allocated for the call voucher
 
-    delegate-call-voucher
-      emit a delegate call voucher read from stdin as a JSON object in the format
-        {"destination": <address>, "payload": <hex-data>}
+    erc1155-batch-transfer
+      emit an ERC-1155 batch transfer read from stdin as a JSON object in the format
+        {
+            "recipient": <address>,
+            "token": <address>,
+            "items": <hex-data>,
+            "app_context": <hex-uint256>
+        }
       where
         <address> contains a 20-byte EVM address in hex,
-        <hex-data> contains arbitrary data in hex
+        <hex-data> contains arbitrary data in hex (each item is 64 bytes)
       if successful, prints to stdout a JSON object in the format
         {"index": <number> }
-      where field "index" is the index allocated for the voucher
+      where field "index" is the index allocated for the transfer
+
+    erc1155-transfer
+      emit an ERC-1155 transfer read from stdin as a JSON object in the format
+        {
+            "recipient": <address>,
+            "token": <address>,
+            "token_id": <hex-uint256>,
+            "value": <hex-uint256>,
+            "app_context": <hex-uint256>
+        }
+      where
+        <address> contains a 20-byte EVM address in hex,
+        <hex-uint256> contains a big-endian 32-byte unsigned integer in hex
+      if successful, prints to stdout a JSON object in the format
+        {"index": <number> }
+      where field "index" is the index allocated for the transfer
+
+    erc20-transfer
+      emit an ERC-20 transfer read from stdin as a JSON object in the format
+        {
+            "recipient": <address>,
+            "token": <address>,
+            "value": <hex-uint256>,
+            "app_context": <hex-uint256>
+        }
+      where
+        <address> contains a 20-byte EVM address in hex,
+        <hex-uint256> contains a big-endian 32-byte unsigned integer in hex
+      if successful, prints to stdout a JSON object in the format
+        {"index": <number> }
+      where field "index" is the index allocated for the transfer
+
+    erc721-transfer
+      emit an ERC-721 transfer read from stdin as a JSON object in the format
+        {
+            "recipient": <address>,
+            "token": <address>,
+            "token_id": <hex-uint256>,
+            "app_context": <hex-uint256>
+        }
+      where
+        <address> contains a 20-byte EVM address in hex,
+        <hex-uint256> contains a big-endian 32-byte unsigned integer in hex
+      if successful, prints to stdout a JSON object in the format
+        {"index": <number> }
+      where field "index" is the index allocated for the transfer
 
     notice
       emit a notice read from stdin as a JSON object in the format
-        {"payload": <hex-data> }
+        {"payload": <hex-data>, "app_context": <hex-uint256> }
       where
         <hex-data> contains arbitrary data in hex
       if successful, prints to stdout a JSON object in the format
@@ -215,71 +277,31 @@ static std::string hex(const uint8_t *data, uint64_t length) {
     return ss.str();
 }
 
-// Read input for voucher data, issue voucher, write result to output
-static int write_voucher(void) try {
-    rollup r;
+// Read input for call voucher data, issue call voucher, write result to output
+static int write_call_voucher(void) try {
+    cmt_buf_t tx;
+    rollup r(&tx);
     auto ji = nlohmann::json::parse(read_input());
     auto payload_bytes = unhex(ji["payload"].get<std::string>());
     auto destination_bytes = unhex20(ji["destination"].get<std::string>());
     auto value_bytes = unhex32(ji["value"].get<std::string>());
-    uint64_t index = 0;
-    cmt_abi_address_t destination;
-    cmt_abi_u256_t value;
-    cmt_abi_bytes_t payload;
-    payload.data = reinterpret_cast<unsigned char *>(payload_bytes.data());
-    payload.length = payload_bytes.size();
 
-    memcpy(destination.data, reinterpret_cast<unsigned char *>(destination_bytes.data()), destination_bytes.size());
-    memcpy(value.data, reinterpret_cast<unsigned char *>(value_bytes.data()), value_bytes.size());
+    cmt_call_voucher_args_t voucher = {};
+    voucher.payload = cmt_buf_make(payload_bytes.size(), reinterpret_cast<unsigned char *>(payload_bytes.data()));
+    memcpy(voucher.destination.data, reinterpret_cast<unsigned char *>(destination_bytes.data()),
+        destination_bytes.size());
+    memcpy(voucher.value.data, reinterpret_cast<unsigned char *>(value_bytes.data()), value_bytes.size());
 
-    // Encode voucher into tx buffer
-    cmt_buf_t tx = cmt_rollup_get_tx(&r);
-    cmt_buf_t msg;
-    // TODO: implement voucher encoding using cmt_abi_put_* functions
-    // int rc = cmt_voucher_encode(tx, &msg, &destination, &value, &payload);
-    // if (rc) return rc;
-    
-    // For now, use empty data (will fail at emit if no encoding done)
-    cmt_buf_t data = cmt_buf_make(0, nullptr);
-    int ret = cmt_rollup_emit_output(r, data);
-    if (ret)
-        return ret;
+    if (ji.contains("app_context")) {
+        auto app_context_bytes = unhex32(ji["app_context"].get<std::string>());
+        memcpy(&voucher.app_context, app_context_bytes.data(), app_context_bytes.size());
+    }
 
-    nlohmann::json j = {{"index", index}};
-    std::cout << j.dump(2) << '\n';
-
-    return 0;
-} catch (std::exception &x) {
-    std::cerr << x.what() << '\n';
-    return 1;
-}
-
-// Read input for delegate call voucher data, issue voucher, write result to output
-static int write_delegate_call_voucher(void) try {
-    rollup r;
-    auto ji = nlohmann::json::parse(read_input());
-    auto payload_bytes = unhex(ji["payload"].get<std::string>());
-    auto destination_bytes = unhex20(ji["destination"].get<std::string>());
-    uint64_t index = 0;
-    cmt_abi_address_t destination;
-    cmt_abi_bytes_t payload;
-    payload.data = reinterpret_cast<unsigned char *>(payload_bytes.data());
-    payload.length = payload_bytes.size();
-
-    memcpy(destination.data, reinterpret_cast<unsigned char *>(destination_bytes.data()), destination_bytes.size());
-
-    // Encode delegate call voucher into tx buffer
-    cmt_buf_t tx = cmt_rollup_get_tx(&r);
-    cmt_buf_t msg;
-    // TODO: implement delegate call voucher encoding using cmt_abi_put_* functions
-    // int rc = cmt_delegate_call_voucher_encode(tx, &msg, &destination, &payload);
-    // if (rc) return rc;
-    
-    // For now, use empty data (will fail at emit if no encoding done)
-    cmt_buf_t data = cmt_buf_make(0, nullptr);
-    int ret = cmt_rollup_emit_output(r, data);
-    if (ret)
-        return ret;
+    cmt_buf_t out = {};
+    uint64_t index = r.get_leaf_count(); // valid on emit_output success
+    if (cmt_call_voucher_encode(tx, &out, &voucher) < 0 || cmt_rollup_emit_output(r, out)) {
+        return 1;
+    }
 
     nlohmann::json j = {{"index", index}};
     std::cout << j.dump(2) << '\n';
@@ -292,33 +314,175 @@ static int write_delegate_call_voucher(void) try {
 
 // Read input for notice data, issue notice, write result to output
 static int write_notice(void) try {
-    rollup r;
+    cmt_buf_t tx;
+    rollup r(&tx);
     auto ji = nlohmann::json::parse(read_input());
     auto payload_bytes = unhex(ji["payload"].get<std::string>());
-    cmt_abi_bytes_t payload;
-    payload.data = reinterpret_cast<unsigned char *>(payload_bytes.data());
-    payload.length = payload_bytes.size();
-    uint64_t index = 0;
+    cmt_notice_args_t notice = {};
+    notice.payload = cmt_buf_make(payload_bytes.size(), reinterpret_cast<unsigned char *>(payload_bytes.data()));
 
-    // Encode notice into tx buffer
-    cmt_buf_t tx = cmt_rollup_get_tx(&r);
-    cmt_buf_t msg;
-    int rc = cmt_notice_encode(tx, &msg, &payload);
-    if (rc)
-        return rc;
-    
-    int ret = cmt_rollup_emit_output(r, msg);
-    if (ret)
-        return ret;
+    if (ji.contains("app_context")) {
+        auto app_context_bytes = unhex32(ji["app_context"].get<std::string>());
+        memcpy(&notice.app_context, app_context_bytes.data(), app_context_bytes.size());
+    }
+
+    cmt_buf_t out = {};
+    uint64_t index = r.get_leaf_count(); // valid on emit_output success
+    if (cmt_notice_encode(tx, &out, &notice) < 0 || cmt_rollup_emit_output(r, out) < 0) {
+        return 1;
+    }
 
     nlohmann::json j = {{"index", index}};
     std::cout << j.dump(2) << '\n';
 
-    return 0;
+    return EXIT_SUCCESS;
 
 } catch (std::exception &x) {
     std::cerr << x.what() << '\n';
-    return 1;
+    return EXIT_FAILURE;
+}
+
+// Read input for erc1155-batch-transfer data, issue transfer, write result to
+// output
+static int write_erc1155_batch_transfer(void) try {
+    cmt_buf_t tx;
+    rollup r(&tx);
+    auto ji = nlohmann::json::parse(read_input());
+    auto recipient_bytes = unhex20(ji["recipient"].get<std::string>());
+    auto token_bytes = unhex20(ji["token"].get<std::string>());
+    auto items_bytes = unhex(ji["items"].get<std::string>());
+
+    cmt_erc1155_batch_transfer_args_t transfer = {};
+    memcpy(transfer.recipient.data, reinterpret_cast<unsigned char *>(recipient_bytes.data()), recipient_bytes.size());
+    memcpy(transfer.token.data, reinterpret_cast<unsigned char *>(token_bytes.data()), token_bytes.size());
+    transfer.items = cmt_buf_make(items_bytes.size(), reinterpret_cast<unsigned char *>(items_bytes.data()));
+
+    if (ji.contains("app_context")) {
+        auto app_context_bytes = unhex32(ji["app_context"].get<std::string>());
+        memcpy(&transfer.app_context, app_context_bytes.data(), app_context_bytes.size());
+    }
+
+    cmt_buf_t out = {};
+    uint64_t index = r.get_leaf_count(); // valid on emit_output success
+    if (cmt_erc1155_batch_transfer_encode(tx, &out, &transfer) < 0 || cmt_rollup_emit_output(r, out) < 0) {
+        return 1;
+    }
+
+    nlohmann::json j = {{"index", index}};
+    std::cout << j.dump(2) << '\n';
+
+    return EXIT_SUCCESS;
+
+} catch (std::exception &x) {
+    std::cerr << x.what() << '\n';
+    return EXIT_FAILURE;
+}
+
+// Read input for erc1155-transfer data, issue transfer, write result to output
+static int write_erc1155_transfer(void) try {
+    cmt_buf_t tx;
+    rollup r(&tx);
+    auto ji = nlohmann::json::parse(read_input());
+    auto recipient_bytes = unhex20(ji["recipient"].get<std::string>());
+    auto token_bytes = unhex20(ji["token"].get<std::string>());
+    auto token_id_bytes = unhex32(ji["token_id"].get<std::string>());
+    auto value_bytes = unhex32(ji["value"].get<std::string>());
+
+    cmt_erc1155_transfer_args_t transfer = {};
+    memcpy(transfer.recipient.data, reinterpret_cast<unsigned char *>(recipient_bytes.data()), recipient_bytes.size());
+    memcpy(transfer.token.data, reinterpret_cast<unsigned char *>(token_bytes.data()), token_bytes.size());
+    memcpy(transfer.token_id.data, reinterpret_cast<unsigned char *>(token_id_bytes.data()), token_id_bytes.size());
+    memcpy(transfer.value.data, reinterpret_cast<unsigned char *>(value_bytes.data()), value_bytes.size());
+
+    if (ji.contains("app_context")) {
+        auto app_context_bytes = unhex32(ji["app_context"].get<std::string>());
+        memcpy(&transfer.app_context, app_context_bytes.data(), app_context_bytes.size());
+    }
+
+    cmt_buf_t out = {};
+    uint64_t index = r.get_leaf_count(); // valid on emit_output success
+    if (cmt_erc1155_transfer_encode(tx, &out, &transfer) < 0 || cmt_rollup_emit_output(r, out) < 0) {
+        return 1;
+    }
+
+    nlohmann::json j = {{"index", index}};
+    std::cout << j.dump(2) << '\n';
+
+    return EXIT_SUCCESS;
+
+} catch (std::exception &x) {
+    std::cerr << x.what() << '\n';
+    return EXIT_FAILURE;
+}
+
+// Read input for erc20-transfer data, issue transfer, write result to output
+static int write_erc20_transfer(void) try {
+    cmt_buf_t tx;
+    rollup r(&tx);
+    auto ji = nlohmann::json::parse(read_input());
+    auto recipient_bytes = unhex20(ji["recipient"].get<std::string>());
+    auto token_bytes = unhex20(ji["token"].get<std::string>());
+    auto value_bytes = unhex32(ji["value"].get<std::string>());
+
+    cmt_erc20_transfer_args_t transfer = {};
+    memcpy(transfer.recipient.data, reinterpret_cast<unsigned char *>(recipient_bytes.data()), recipient_bytes.size());
+    memcpy(transfer.token.data, reinterpret_cast<unsigned char *>(token_bytes.data()), token_bytes.size());
+    memcpy(transfer.value.data, reinterpret_cast<unsigned char *>(value_bytes.data()), value_bytes.size());
+
+    if (ji.contains("app_context")) {
+        auto app_context_bytes = unhex32(ji["app_context"].get<std::string>());
+        memcpy(&transfer.app_context, app_context_bytes.data(), app_context_bytes.size());
+    }
+
+    cmt_buf_t out = {};
+    uint64_t index = r.get_leaf_count(); // valid on emit_output success
+    if (cmt_erc20_transfer_encode(tx, &out, &transfer) < 0 || cmt_rollup_emit_output(r, out) < 0) {
+        return 1;
+    }
+
+    nlohmann::json j = {{"index", index}};
+    std::cout << j.dump(2) << '\n';
+
+    return EXIT_SUCCESS;
+
+} catch (std::exception &x) {
+    std::cerr << x.what() << '\n';
+    return EXIT_FAILURE;
+}
+
+// Read input for erc721-transfer data, issue transfer, write result to output
+static int write_erc721_transfer(void) try {
+    cmt_buf_t tx;
+    rollup r(&tx);
+    auto ji = nlohmann::json::parse(read_input());
+    auto recipient_bytes = unhex20(ji["recipient"].get<std::string>());
+    auto token_bytes = unhex20(ji["token"].get<std::string>());
+    auto token_id_bytes = unhex32(ji["token_id"].get<std::string>());
+
+    cmt_erc721_transfer_args_t transfer = {};
+    memcpy(transfer.recipient.data, reinterpret_cast<unsigned char *>(recipient_bytes.data()), recipient_bytes.size());
+    memcpy(transfer.token.data, reinterpret_cast<unsigned char *>(token_bytes.data()), token_bytes.size());
+    memcpy(transfer.token_id.data, reinterpret_cast<unsigned char *>(token_id_bytes.data()), token_id_bytes.size());
+
+    if (ji.contains("app_context")) {
+        auto app_context_bytes = unhex32(ji["app_context"].get<std::string>());
+        memcpy(&transfer.app_context, app_context_bytes.data(), app_context_bytes.size());
+    }
+
+    cmt_buf_t out = {};
+    uint64_t index = r.get_leaf_count(); // valid on emit_output success
+    if (cmt_erc721_transfer_encode(tx, &out, &transfer) < 0 || cmt_rollup_emit_output(r, out) < 0) {
+        return 1;
+    }
+
+    nlohmann::json j = {{"index", index}};
+    std::cout << j.dump(2) << '\n';
+
+    return EXIT_SUCCESS;
+
+} catch (std::exception &x) {
+    std::cerr << x.what() << '\n';
+    return EXIT_FAILURE;
 }
 
 // Read input for report data, issue report
@@ -326,11 +490,9 @@ static int write_report(void) try {
     rollup r;
     auto ji = nlohmann::json::parse(read_input());
     auto payload_bytes = unhex(ji["payload"].get<std::string>());
-    cmt_abi_bytes_t payload;
-    payload.data = reinterpret_cast<unsigned char *>(payload_bytes.data());
-    payload.length = payload_bytes.size();
-    cmt_buf_t data = cmt_buf_make(payload.length, payload.data);
-    return cmt_rollup_emit_report(r, data);
+    const void *data = reinterpret_cast<unsigned char *>(payload_bytes.data());
+    size_t length = payload_bytes.size();
+    return cmt_rollup_emit_report(r, cmt_buf_make(length, data));
 } catch (std::exception &x) {
     std::cerr << x.what() << '\n';
     return 1;
@@ -341,24 +503,21 @@ static int throw_exception(void) try {
     rollup r;
     auto ji = nlohmann::json::parse(read_input());
     auto payload_bytes = unhex(ji["payload"].get<std::string>());
-    cmt_abi_bytes_t payload;
-    payload.data = reinterpret_cast<unsigned char *>(payload_bytes.data());
-    payload.length = payload_bytes.size();
-    cmt_buf_t data = cmt_buf_make(payload.length, payload.data);
-    return cmt_rollup_emit_exception(r, data);
+    const void *data = reinterpret_cast<unsigned char *>(payload_bytes.data());
+    size_t length = payload_bytes.size();
+    return cmt_rollup_emit_exception(r, cmt_buf_make(length, data));
 } catch (std::exception &x) {
     std::cerr << x.what() << '\n';
     return 1;
 }
 
 // Read advance state data from driver, write to output
-static int write_advance_state(rollup &r, const cmt_rollup_finish_t *f) {
-    (void) f;
-    cmt_rollup_advance_t advance;
-    int rc = cmt_rollup_read_advance_state(r, &advance);
+static int write_advance_state(cmt_buf_t *rx) {
+    cmt_evm_advance_args_t advance;
 
-    if (rc != 0) {
-        return 1;
+    int n = cmt_evm_advance_decode(*rx, &advance);
+    if (n < 0) {
+        return n;
     }
 
     nlohmann::json j = {{"request_type", "advance_state"},
@@ -371,27 +530,20 @@ static int write_advance_state(rollup &r, const cmt_rollup_finish_t *f) {
                 {"block_timestamp", advance.block_timestamp},
                 {"prev_randao", hex(advance.prev_randao.data, std::size(advance.prev_randao.data))},
                 {"index", advance.index},
-                {"payload", hex(reinterpret_cast<const uint8_t *>(advance.payload.data), advance.payload.length)},
+                {"payload", hex((uint8_t *) cmt_buf_begin(advance.payload), cmt_buf_length(advance.payload))},
             }}};
     std::cout << j.dump(2) << '\n';
     return 0;
 }
 
 // Read inspect state data from driver, write to output
-static int write_inspect_state(rollup &r, const cmt_rollup_finish_t *f) {
-    (void) f;
-    cmt_rollup_inspect_t inspect;
-    int rc = cmt_rollup_read_inspect_state(r, &inspect);
-
-    if (rc != 0) {
-        return 1;
-    }
-
+static int write_inspect_state(cmt_buf_t *rx) {
     nlohmann::json j = {{"request_type", "inspect_state"},
         {"data",
-            {
-                {"payload", hex(reinterpret_cast<const uint8_t *>(inspect.payload.data), inspect.payload.length)},
-            }}};
+            {{
+                "payload",
+                hex((uint8_t *) cmt_buf_begin(*rx), cmt_buf_length(*rx)),
+            }}}};
     std::cout << j.dump(2) << '\n';
     return 0;
 }
@@ -399,17 +551,21 @@ static int write_inspect_state(rollup &r, const cmt_rollup_finish_t *f) {
 // Finish current request and get next
 static int finish_request_and_get_next(bool accept) try {
     rollup r;
-    cmt_rollup_finish_t f;
-    f.accept_previous_request = accept;
-    if (cmt_rollup_finish(r, &f))
+    cmt_buf_t rx[1] = {};
+
+    long req_type = cmt_rollup_wait_for_input(r, accept, rx);
+    if (req_type < 0) {
         return 1;
-    if (f.next_request_type == HTIF_YIELD_REASON_ADVANCE) {
-        cmt_rollup_reset_merkle(r);
-        return write_advance_state(r, &f);
-    } else if (f.next_request_type == HTIF_YIELD_REASON_INSPECT) {
-        return write_inspect_state(r, &f);
     }
-    return 0;
+
+    switch (req_type) {
+        case CMT_ROLLUP_REQ_TYPE_ADVANCE:
+            return write_advance_state(rx);
+        case CMT_ROLLUP_REQ_TYPE_INSPECT:
+            return write_inspect_state(rx);
+        default:
+            return 1; // or should we ignore?
+    }
 } catch (std::exception &x) {
     std::cerr << x.what() << '\n';
     return 1;
@@ -449,10 +605,16 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
     const char *command = argv[1];
-    if (strcmp(command, "voucher") == 0) {
-        return write_voucher();
-    } else if (strcmp(command, "delegate-call-voucher") == 0) {
-        return write_delegate_call_voucher();
+    if (strcmp(command, "call-voucher") == 0) {
+        return write_call_voucher();
+    } else if (strcmp(command, "erc1155-batch-transfer") == 0) {
+        return write_erc1155_batch_transfer();
+    } else if (strcmp(command, "erc1155-transfer") == 0) {
+        return write_erc1155_transfer();
+    } else if (strcmp(command, "erc20-transfer") == 0) {
+        return write_erc20_transfer();
+    } else if (strcmp(command, "erc721-transfer") == 0) {
+        return write_erc721_transfer();
     } else if (strcmp(command, "notice") == 0) {
         return write_notice();
     } else if (strcmp(command, "report") == 0) {
