@@ -18,14 +18,20 @@ PREFIX  ?= /usr
 CC      := $(TOOLCHAIN_PREFIX)gcc
 CFLAGS  += -Wall -Wextra -pedantic -O2 -I../libcmt/include
 LDFLAGS += -L../libcmt/build/riscv64 -l:libcmt.a
+LDFLAGS_MOCK += -L../libcmt/build/mock -l:libcmt.a
 
 all: ioctl-echo-loop
 
 ioctl-echo-loop: ioctl-echo-loop.c
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
+ioctl-echo-loop-mock: ioctl-echo-loop.c
+	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS_MOCK)
 
 install: ioctl-echo-loop
 	install -Dm755 ioctl-echo-loop $(DESTDIR)$(PREFIX)/bin/ioctl-echo-loop
 
+test: ioctl-echo-loop-mock
+	sh ioctl-echo-loop-mock-test.sh
+
 clean:
-	@rm -f ioctl-echo-loop
+	@rm -f ioctl-echo-loop ioctl-echo-loop-mock

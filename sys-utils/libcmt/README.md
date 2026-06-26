@@ -1,16 +1,19 @@
 # Cartesi Machine Tools
 
-Is a C library to facilitate the development of applications running on the cartesi-machine.
-It handles the IO and communication protocol with the machine-emulator.
+Cartesi Machine Tools is a C library to facilitate the development of applications running on the Cartesi Machine.
+It handles the IO and communication protocol with the machine emulator.
 
-The high level @ref libcmt\_rollup API provides functions for common operations, such as emitting outputs (notices/vouchers), emitting reports, throwing exceptions, and retrieving the next input. The @ref libcmt\_codec module provides encoding/decoding for known ABI formats like advance state and the Output1..Output4 envelopes.
+The high level @ref libcmt\_rollup API provides functions for common operations,
+such as emitting outputs (notices/vouchers), emitting reports, throwing exceptions, and retrieving the next input.
 Check the [cartesi documentation](https://docs.cartesi.io/) for an explanation of the rollup interaction model.
 
-In addition to the above mentioned module, we provide @ref libcmt\_io\_driver, a thin abstraction of the linux kernel driver.
+For lower-level control, @ref libcmt\_io provides a thin abstraction of the Linux kernel driver.
 
 And finally, a couple of utility modules used by the high level API are also exposed.
 - @ref libcmt\_abi is an Ethereum Virtual Machine Application Binary Interface (EVM-ABI) encoder / decoder.
 - @ref libcmt\_codec provides encoding/decoding for known Solidity ABI types (EvmAdvance, Notice, CallVoucher, ERC20Transfer, ERC721Transfer, ERC1155 transfers).
+- @ref libcmt\_buf is a bounds-checking buffer.
+- @ref libcmt\_merkle is a sparse merkle tree implementation on top of Keccak.
 - @ref libcmt\_buf is a bounds-checking buffer.
 - @ref libcmt\_merkle is a sparse merkle tree implementation on top of Keccak.
 - @ref libcmt\_keccak is the hashing function used extensively by Ethereum.
@@ -20,7 +23,7 @@ We also provide `.pc` (pkg-config) files to facilitate linking.
 
 # mock and testing
 
-This library provides a mock implementation of @ref libcmt\_io\_driver that is
+This library provides a mock implementation of @ref libcmt\_io that is
 able to simulate requests and replies via files on the host machine.
 
 - Build it with: `make mock`.
@@ -60,12 +63,17 @@ The (verifiable) outputs root hash:
 advance.outputs_root_hash.bin
 ```
 
-Inputs must follow this syntax, a comma separated list of reason number followed by a file path:
+Progress updates are printed to stderr (no file is generated).
+
+Inputs must follow this syntax, a comma-separated list of reason number followed by a file path:
 ```
 CMT_INPUTS="<reason-number> ':' <filepath> ( ',' <reason-number> ':' <filepath> ) *"
 ```
 
 For rollup, available reasons are: `0` is advance and `1` is inspect.
+
+File paths must not contain commas.
+When the inputs list is exhausted, `cmt_rollup_wait_for_input` returns `-ENODATA`.
 
 In addition to @p CMT\_INPUTS, there is also the @p CMT\_DEBUG variable.
 Enabling it will cause additional debug messages to be displayed.
@@ -76,8 +84,8 @@ CMT_DEBUG=yes ./application
 
 ## generating inputs
 
-Inputs and Outputs are expected to be EVM-ABI encoded. Encoding and decoding
-can be achieved multiple ways, including writing tools with this library. A
+Advance state inputs and outputs are EVM-ABI encoded. Encoding and decoding
+can be achieved in multiple ways, including writing tools with this library. A
 simple way to generate testing data is to use the @p cast tool from
 [foundry](http://book.getfoundry.sh/reference/cast/cast.html) and `xxd`.
 
@@ -90,10 +98,11 @@ cast calldata "EvmAdvance(uint64,address,address,uint64,uint64,uint256,uint64,by
 	0x0000000000000000000000000000000000000004 \
 	0x0000000000000000000000000000000000000005 \
 	0x0000000000000000000000000000000000000006 \
+	0x0000000000000000000000000000000000000007 \
 	0x`echo "advance-0" | xxd -p -c0` | xxd -r -p > 0.bin
 ```
 
-Inspect states require no encoding.
+Inspect inputs are raw bytes (no ABI encoding required).
 ```
 echo -en "inspect-0" > 1.bin
 ```

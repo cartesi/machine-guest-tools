@@ -32,9 +32,7 @@ int cmt_io_init(cmt_io_t *_me) {
         return -EBUSY;
     }
 
-    open_count++;
     cmt_io_mock_t *me = &_me->mock;
-
     size_t tx_length = 2U << 20; // 2MB
     size_t rx_length = 2U << 20; // 2MB
     *me->tx = cmt_buf_make(tx_length, calloc(tx_length, 1));
@@ -62,6 +60,7 @@ int cmt_io_init(cmt_io_t *_me) {
     me->report_seq = 0;
     me->exception_seq = 0;
 
+    open_count++;
     return 0;
 }
 

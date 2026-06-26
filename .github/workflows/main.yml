@@ -126,3 +126,6 @@ jobs:
       - name: Test libcmt mock on host
         run: |
           make -C sys-utils/libcmt/ -j$(nproc) host test
+      - name: Smoke mock test ioctl-echo-loop 
+        run: |
+          make -C sys-utils/ioctl-echo-loop/ -j$(nproc) test
