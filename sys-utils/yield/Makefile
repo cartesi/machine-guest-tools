@@ -18,11 +18,15 @@ PREFIX  ?= /usr
 CC      := $(TOOLCHAIN_PREFIX)gcc
 CFLAGS  += -Wall -Wextra -pedantic -O2 -I../libcmt/include
 LDFLAGS += -L../libcmt/build/riscv64 -l:libcmt.a
+LDFLAGS_MOCK += -L../libcmt/build/mock -l:libcmt.a
 
 all: yield
 
 yield: yield.c
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
+
+yield-mock: yield.c
+	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS_MOCK)
 
 install: yield
 	install -Dm755 yield $(DESTDIR)$(PREFIX)/bin/yield
