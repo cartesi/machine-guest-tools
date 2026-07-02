@@ -46,13 +46,14 @@ examples: $(examples_OBJ)
 
 #-------------------------------------------------------------------------------
 libcmt_SRC := \
-	src/buf.c \
 	src/abi.c \
+	src/buf.c \
+	src/codec.c \
+	src/io.c \
 	src/keccak.c \
 	src/merkle.c \
 	src/rollup.c \
 	src/util.c \
-	src/io.c
 
 libcmt_OBJDIR    := build/riscv64
 libcmt_OBJ       := $(patsubst %.c,$(libcmt_OBJDIR)/%.o,$(libcmt_SRC))
@@ -90,11 +91,12 @@ install: install-run install-dev
 mock_SRC := \
 	src/abi.c \
 	src/buf.c \
+	src/codec.c \
+	src/io-mock.c \
 	src/keccak.c \
 	src/merkle.c \
 	src/rollup.c \
 	src/util.c \
-	src/io-mock.c
 
 mock_OBJDIR := build/mock
 mock_OBJ    := $(patsubst %.c,$(mock_OBJDIR)/%.o,$(mock_SRC))
@@ -127,6 +129,7 @@ unittests_BINS := \
 	$(mock_OBJDIR)/abi-multi \
 	$(mock_OBJDIR)/abi-single \
 	$(mock_OBJDIR)/buf \
+	$(mock_OBJDIR)/codec.golden \
 	$(mock_OBJDIR)/io \
 	$(mock_OBJDIR)/keccak \
 	$(mock_OBJDIR)/merkle \
@@ -151,7 +154,10 @@ $(mock_OBJDIR)/keccak: tests/keccak.c $(mock_LIB)
 $(mock_OBJDIR)/merkle: tests/merkle.c $(mock_LIB)
 	$(CC) $(CFLAGS) -o $@ $^
 
-$(mock_OBJDIR)/rollup: tests/rollup.c tests/data.h $(mock_LIB)
+$(mock_OBJDIR)/rollup: tests/rollup.c $(mock_LIB)
+	$(CC) -Itests $(CFLAGS) -o $@ $^
+
+$(mock_OBJDIR)/codec.golden: tests/codec.golden.c tests/data.h $(mock_LIB)
 	$(CC) -Itests $(CFLAGS) -o $@ $^
 
 $(mock_OBJDIR)/progress: tests/progress.c $(mock_LIB)
@@ -182,7 +188,7 @@ $(tools_OBJDIR)/funsel: tools/funsel.c $(mock_LIB)
 
 tools: $(tools_BINS)
 
-HDRS := $(patsubst %,include/libcmt/%, buf.h abi.h keccak.h merkle.h io.h rollup.h)
+HDRS := $(patsubst %,include/libcmt/%, buf.h abi.h codec.h keccak.h merkle.h io.h rollup.h util.h)
 build/ffi.h: $(HDRS)
 	cat $^ | sh tools/prepare-ffi.sh > $@
 #-------------------------------------------------------------------------------

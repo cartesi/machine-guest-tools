@@ -9,10 +9,10 @@ Check the [cartesi documentation](https://docs.cartesi.io/) for an explanation o
 In addition to the above mentioned module, we provide @ref libcmt\_io\_driver, a thin abstraction of the linux kernel driver.
 
 And finally, a couple of utility modules used by the high level API are also exposed.
-- @ref libcmt\_abi is a Ethereum Virtual Machine Application Binary Interface (EVM-ABI) encoder / decoder.
-- @ref libcmt\_codec provides encoding/decoding for known ABI formats (advance state, Output1..Output4 envelopes).
-- @ref libcmt\_buf is a bounds checking buffer.
-- @ref libcmt\_merkle is a sparse merkle tree implementation on top of keccak.
+- @ref libcmt\_abi is an Ethereum Virtual Machine Application Binary Interface (EVM-ABI) encoder / decoder.
+- @ref libcmt\_codec provides encoding/decoding for known Solidity ABI types (EvmAdvance, Notice, CallVoucher, ERC20Transfer, ERC721Transfer, ERC1155 transfers).
+- @ref libcmt\_buf is a bounds-checking buffer.
+- @ref libcmt\_merkle is a sparse merkle tree implementation on top of Keccak.
 - @ref libcmt\_keccak is the hashing function used extensively by Ethereum.
 
 The header files and a compiled RISC-V version of this library can be found [here](https://github.com/cartesi/machine-guest-tools/).
@@ -83,7 +83,7 @@ simple way to generate testing data is to use the @p cast tool from
 
 Encoding an @p EvmAdvance:
 ```
-cast calldata "EvmAdvance(uint256,address,address,uint256,uint256,uint256,bytes)" \
+cast calldata "EvmAdvance(uint64,address,address,uint64,uint64,uint256,uint64,bytes)" \
 	0x0000000000000000000000000000000000000001 \
 	0x0000000000000000000000000000000000000002 \
 	0x0000000000000000000000000000000000000003 \
@@ -100,39 +100,23 @@ echo -en "inspect-0" > 1.bin
 
 ## parsing outputs
 
-Outputs use the Output1..Output4 envelope format (see the [Output Indexing specification](https://github.com/cartesi/rollups-contracts/blob/feature/output-indexing-simpl/docs/output-indexing.md)).
+Outputs use direct Solidity function call encoding (see the [Output Indexing specification](https://github.com/cartesi/rollups-contracts/blob/feature/output-indexing-simpl/docs/output-indexing.md)).
 For example, a CALL voucher is encoded as:
 ```
-Output2(bytes32[2],bytes)
-  args[0] = keccak256("cartesi.output.v1.call-voucher")
-  args[1] = bytes32(uint256(uint160(destination)))
-  data    = abi.encode(value, payload)
+CallVoucher(address,uint256,bytes)
+  destination = <20-byte address>
+  value       = <32-byte uint256>
+  payload     = <bytes>
 ```
 
-Decode a CALL voucher with `cast`:
+Decode a CallVoucher with `cast`:
 ```
-cast calldata-decode "Output2(bytes32[2],bytes)" 0x`xxd -p -c0 "$1"` | (
-    read arg0
-    read arg1
-    read bytes
-
-    echo "{"
-    printf '\t"arg0" : "%s",\n' $arg0
-    printf '\t"destination" : "%s",\n' $arg1
-    printf '\t"data" : "%s"\n' $bytes
-    echo "}"
-)
+cast calldata-decode "CallVoucher(address,uint256,bytes)" 0x`xxd -p -c0 "$1"`
 ```
 
 Decode a Notice with `cast`:
 ```
-cast calldata-decode "Output1(bytes32[1],bytes)" 0x`xxd -p -c0 "$1"` | (
-    read arg0
-    read bytes
-
-    echo "{"
-    printf '\t"arg0" : "%s",\n' $arg0
-    printf '\t"data" : "%s"\n' $bytes
-    echo "}"
-)
+cast calldata-decode "Notice(bytes)" 0x`xxd -p -c0 "$1"`
 ```
+
+See the @ref libcmt\_codec module for the full list of supported output types (ERC20Transfer, ERC721Transfer, ERC1155SingleTransfer, ERC1155BatchTransfer).
