@@ -110,22 +110,24 @@ echo -en "inspect-0" > 1.bin
 ## parsing outputs
 
 Outputs use direct Solidity function call encoding (see the [Output Indexing specification](https://github.com/cartesi/rollups-contracts/blob/feature/output-indexing-simpl/docs/output-indexing.md)).
+Each output includes an `app_context` field (a `bytes32`), free for applications to use as they see fit. Recipients can filter outputs by this value.
 For example, a CALL voucher is encoded as:
 ```
-CallVoucher(address,uint256,bytes)
+CallVoucher(address,bytes32,uint256,bytes)
   destination = <20-byte address>
+  app_context = <32-byte bytes32>
   value       = <32-byte uint256>
   payload     = <bytes>
 ```
 
 Decode a CallVoucher with `cast`:
 ```
-cast calldata-decode "CallVoucher(address,uint256,bytes)" 0x`xxd -p -c0 "$1"`
+cast calldata-decode "CallVoucher(address,bytes32,uint256,bytes)" 0x`xxd -p -c0 "$1"`
 ```
 
 Decode a Notice with `cast`:
 ```
-cast calldata-decode "Notice(bytes)" 0x`xxd -p -c0 "$1"`
+cast calldata-decode "Notice(bytes32,bytes)" 0x`xxd -p -c0 "$1"`
 ```
 
-See the @ref libcmt\_codec module for the full list of supported output types (ERC20Transfer, ERC721Transfer, ERC1155SingleTransfer, ERC1155BatchTransfer).
+See the @ref libcmt\_codec module for the full list of supported output types (ERC20Transfer, ERC721Transfer, ERC1155SingleTransfer, ERC1155BatchTransfer). All output types include an `app_context` `bytes32` field.

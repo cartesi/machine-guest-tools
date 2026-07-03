@@ -5,6 +5,57 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- Added `libcmt/codec.h` library for ABI encoding/decoding of EVM operations.
+  All codec structs include an `app_context` (`cmt_abi_bytes32_t`) as the first field:
+  - `cmt_call_voucher_args_t` / `cmt_call_voucher_encode` / `cmt_call_voucher_decode`
+  - `cmt_notice_args_t` / `cmt_notice_encode` / `cmt_notice_decode`
+  - `cmt_evm_advance_args_t` / `cmt_evm_advance_encode` / `cmt_evm_advance_decode`
+  - `cmt_erc20_transfer_args_t` / `cmt_erc20_transfer_encode` / `cmt_erc20_transfer_decode`
+  - `cmt_erc721_transfer_args_t` / `cmt_erc721_transfer_encode` / `cmt_erc721_transfer_decode`
+  - `cmt_erc1155_transfer_args_t` / `cmt_erc1155_transfer_encode` / `cmt_erc1155_transfer_decode`
+  - `cmt_erc1155_batch_transfer_args_t` / `cmt_erc1155_batch_transfer_encode` / `cmt_erc1155_batch_transfer_decode`
+- Added `cmt_rollup_wait_for_input()` to `libcmt/rollup.h` for simplified input handling
+- Added `cmt_rollup_get_io()` and `cmt_rollup_get_merkle()` accessor functions to `libcmt/rollup.h`
+- Added `cmt_rollup_emit_output()`, `cmt_rollup_emit_report()`, and `cmt_rollup_emit_exception()` with zero-copy `cmt_buf_t` semantics
+- Added `cmt_abi_bytes32_t`, `cmt_abi_frame_t`, and `cmt_abi_dyn_state_t` types to `libcmt/abi.h`
+- Added `cmt_abi_put_bytesN` / `cmt_abi_get_bytesN` for encoding/decoding Solidity `bytes<M>` types
+- Added `cmt_abi_reserve_dyn_tail` / `cmt_abi_commit_dyn_tail` for two-phase dynamic encoding
+- Added `cmt_abi_view_dyn_tail` for zero-copy dynamic decoding
+- Added `cmt_abi_get_dyn_tail` for copying dynamic data into user-provided buffers
+- Added `cmt_abi_put_uint_be` / `cmt_abi_get_uint_be` for big-endian integer encoding/decoding
+- Added `cmt_abi_put_uint256` / `cmt_abi_get_uint256` convenience functions
+- Added `CMT_DBG` macro and `cmt_util_debug_enabled()` to `libcmt/util.h`
+- Added output merkle hash caching: reuses root hash when leaf count hasn't changed
+
+### Changed
+- **ABI API overhaul** in `libcmt/abi.h`:
+  - Renamed `cmt_abi_put_bytes_s` → `cmt_abi_put_dyn_head`, `cmt_abi_put_bytes_d` → `cmt_abi_put_dyn_tail`
+  - Renamed `cmt_abi_get_bytes_s` → `cmt_abi_get_dyn_head`, `cmt_abi_get_bytes_d` → `cmt_abi_get_dyn_tail`
+  - Renamed `cmt_abi_start_frame` → `cmt_abi_mark_frame`
+  - ABI function parameter naming convention: `me` → `wr` (writer) / `rd` (reader)
+- **Rollup API overhaul** in `libcmt/rollup.h`:
+  - `cmt_rollup_init()` now takes an optional `tx` output parameter
+  - Replaced `cmt_rollup_emit_voucher()` with `cmt_rollup_emit_output()` taking `cmt_buf_t`
+  - Replaced `cmt_rollup_emit_notice()` with `cmt_rollup_emit_report()` taking `cmt_buf_t`
+  - Rollup header no longer includes `abi.h` (ABI encoding moved to `codec.h`)
+  - Output handling is zero-copy message start matches the tx buffer start
+- Replaced `cmt_rollup_inspect_t`, `cmt_rollup_finish_t`, and `cmt_gio_t` with `cmt_rollup_req_type_t` enum and `cmt_rollup_wait_for_input()`
+- Changed `cmt_rollup_advance_t` → `cmt_evm_advance_args_t` and moved to `libcmt/codec.h`
+- Changed `cmt_io_driver_t` → `cmt_io_t`, `cmt_io_driver_mock_t` → `cmt_io_mock_t`, and `cmt_io_driver_ioctl_t` → `cmt_io_ioctl_t` in `libcmt/io.h`
+- Removed `#include "abi.h"` from `libcmt/rollup.h`
+- Updated `ioctl-echo-loop` to use the new libcmt codec API and `cmt_rollup_wait_for_input()`
+- Updated `sys-utils/rollup/rollup.cpp` to use the new libcmt codec API
+- Updated `sys-utils/yield/yield.c` to use the new `cmt_io_t` type
+
+### Removed
+- **rollup-http**: Removed the entire `rollup-http/` directory including `rollup-http-server`, `echo-dapp`, and `rollup-http-client`
+- **Delegate call voucher**: Removed `cmt_rollup_emit_delegate_call_voucher()` from `libcmt/rollup.h`, the `delegate-call-voucher` command from `sys-utils/rollup/rollup.cpp`, and the `--delegate-call-vouchers` flag from `sys-utils/ioctl-echo-loop/ioctl-echo-loop.c`
+- **GIO support**: Removed `cmt_gio_t` and `cmt_gio_request()` from `libcmt/rollup.h`
+- Removed `cmt_rollup_read_advance_state()`, `cmt_rollup_read_inspect_state()`, and `cmt_rollup_finish()` (replaced by `cmt_rollup_wait_for_input()`)
+- Removed `cmt_rollup_load_merkle()`, `cmt_rollup_save_merkle()`, and `cmt_rollup_reset_merkle()` from `libcmt/rollup.h`
+- Removed raw encode/decode functions from `libcmt/abi.h`: `cmt_abi_encode_uint`, `cmt_abi_encode_uint_nr`, `cmt_abi_encode_uint_nn`, `cmt_abi_decode_uint`, `cmt_abi_decode_uint_nr`, `cmt_abi_decode_uint_nn`
+- Removed `cmt_abi_peek_bytes_d` (replaced by `cmt_abi_view_dyn_tail`)
 
 ## [0.17.2] - 2025-10-21
 ### Changed
