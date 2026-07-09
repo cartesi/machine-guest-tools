@@ -23,37 +23,26 @@ static inline int is_pow2(int l) {
     return !(l & (l - 1));
 }
 
-void cmt_buf_init(cmt_buf_t *me, size_t length, void *data) {
-    if (!me) {
-        return;
-    }
-    me->begin = (uint8_t *) data;
-    me->end = (uint8_t *) data + length;
+cmt_buf_t cmt_buf_make(size_t length, const void *data) {
+    return (cmt_buf_t){.begin = (uint8_t *) data, .end = (uint8_t *) data + length};
 }
 
-int cmt_buf_split(const cmt_buf_t *me, size_t lhs_length, cmt_buf_t *lhs, cmt_buf_t *rhs) {
-    if (!me) {
-        return -EINVAL;
-    }
-    if (!lhs) {
-        return -EINVAL;
-    }
-    if (!rhs) {
-        return -EINVAL;
-    }
-
-    uint8_t *begin = me->begin;
-    uint8_t *split = me->begin + lhs_length;
-    uint8_t *end = me->end;
+int cmt_buf_split(cmt_buf_t me, size_t lhs_length, cmt_buf_t *lhs, cmt_buf_t *rhs) {
+    uintptr_t begin = (uintptr_t) me.begin;
+    uintptr_t split = (uintptr_t) me.begin + lhs_length;
+    uintptr_t end = (uintptr_t) me.end;
 
     if (split < begin || end < split) {
         return -ENOBUFS;
     }
-
-    lhs->begin = begin;
-    lhs->end = split;
-    rhs->begin = split;
-    rhs->end = end;
+    if (lhs) {
+        lhs->begin = (uint8_t *) begin; // NOLINT performance-no-int-to-ptr
+        lhs->end = (uint8_t *) split;   // NOLINT performance-no-int-to-ptr
+    }
+    if (rhs) {
+        rhs->begin = (uint8_t *) split; // NOLINT performance-no-int-to-ptr
+        rhs->end = (uint8_t *) end;     // NOLINT performance-no-int-to-ptr
+    }
 
     return 0;
 }
@@ -79,11 +68,12 @@ bool cmt_buf_split_by_comma(cmt_buf_t *x, cmt_buf_t *xs) {
     return cmt_buf_split_by(x, xs, comma);
 }
 
-size_t cmt_buf_length(const cmt_buf_t *me) {
-    if (!me) {
-        return 0;
-    }
-    return me->end - me->begin;
+void *cmt_buf_begin(cmt_buf_t me) {
+    return me.begin;
+}
+
+size_t cmt_buf_length(cmt_buf_t me) {
+    return me.end - me.begin;
 }
 
 static void xxd(const uint8_t *p, const uint8_t *q, size_t mask) {
@@ -103,7 +93,7 @@ static void xxd(const uint8_t *p, const uint8_t *q, size_t mask) {
     }
 }
 
-void cmt_buf_xxd(void *begin, void *end, int bytes_per_line) {
+void cmt_buf_xxd(const void *begin, const void *end, int bytes_per_line) {
     if (!begin) {
         return;
     }

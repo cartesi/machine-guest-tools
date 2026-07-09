@@ -30,31 +30,7 @@ static void print(int m, uint8_t md[CMT_KECCAK_LENGTH]) {
 }
 #endif
 
-void test_merkle_init_and_reset(void) {
-    cmt_merkle_t merkle;
-    cmt_merkle_init(&merkle);
-    assert(cmt_merkle_get_leaf_count(&merkle) == 0);
-    for (int i = 0; i < CMT_MERKLE_TREE_HEIGHT; ++i) {
-        for (int j = 0; j < CMT_KECCAK_LENGTH; ++j) {
-            assert(merkle.state[i][j] == 0);
-        }
-    }
-
-    uint8_t data[CMT_KECCAK_LENGTH] = {0};
-    assert(cmt_merkle_push_back(&merkle, data) == 0);
-    assert(cmt_merkle_get_leaf_count(&merkle) == 1);
-
-    cmt_merkle_reset(&merkle);
-    assert(cmt_merkle_get_leaf_count(&merkle) == 0);
-    for (int i = 0; i < CMT_MERKLE_TREE_HEIGHT; ++i) {
-        for (int j = 0; j < CMT_KECCAK_LENGTH; ++j) {
-            assert(merkle.state[i][j] == 0);
-        }
-    }
-    printf("%s passed\n", __FUNCTION__);
-}
-
-void test_merkle_get_root_pristine(void) {
+static void test_merkle_get_root_pristine(void) {
     cmt_merkle_t merkle;
     cmt_merkle_init(&merkle);
     assert(cmt_merkle_get_leaf_count(&merkle) == 0);
@@ -68,10 +44,10 @@ void test_merkle_get_root_pristine(void) {
     for (int i = 0; i < CMT_KECCAK_LENGTH; ++i) {
         assert(root[i] == expected_root[i]);
     }
-    printf("%s passed\n", __FUNCTION__);
+    printf("test %s passed\n", __func__);
 }
 
-void test_merkle_push_back_and_get_root(void) {
+static void test_merkle_push_back_and_get_root(void) {
     cmt_merkle_t merkle;
     cmt_merkle_init(&merkle);
     uint8_t data[CMT_KECCAK_LENGTH] = {0};
@@ -86,10 +62,10 @@ void test_merkle_push_back_and_get_root(void) {
     for (int i = 0; i < CMT_KECCAK_LENGTH; ++i) {
         assert(root[i] == expected_root[i]);
     }
-    printf("%s passed\n", __FUNCTION__);
+    printf("test %s passed\n", __func__);
 }
 
-void test_cmt_merkle_push_back_data_and_get_root(void) {
+static void test_cmt_merkle_push_back_data_and_get_root(void) {
     cmt_merkle_t merkle;
     cmt_merkle_init(&merkle);
 
@@ -109,10 +85,10 @@ void test_cmt_merkle_push_back_data_and_get_root(void) {
         assert(root[i] == expected_root[i]);
     }
 
-    printf("%s passed\n", __FUNCTION__);
+    printf("test %s passed\n", __func__);
 }
 
-void test_cmt_merkle_push_back(void) {
+static void test_cmt_merkle_push_back(void) {
     cmt_merkle_t merkle;
     cmt_merkle_init(&merkle);
 
@@ -124,10 +100,10 @@ void test_cmt_merkle_push_back(void) {
     assert(cmt_merkle_push_back(&merkle, hash2) == 0);
     assert(cmt_merkle_get_leaf_count(&merkle) == 2);
 
-    printf("%s passed\n", __FUNCTION__);
+    printf("test %s passed\n", __func__);
 }
 
-void test_cmt_merkle_push_back_data(void) {
+static void test_cmt_merkle_push_back_data(void) {
     cmt_merkle_t merkle;
     cmt_merkle_init(&merkle);
 
@@ -139,10 +115,10 @@ void test_cmt_merkle_push_back_data(void) {
     assert(cmt_merkle_push_back_data(&merkle, strlen(data2), data2) == 0);
     assert(cmt_merkle_get_leaf_count(&merkle) == 2);
 
-    printf("%s passed\n", __FUNCTION__);
+    printf("test %s passed\n", __func__);
 }
 
-void test_cmt_merkle_save_load(void) {
+static void test_cmt_merkle_save_load(void) {
     cmt_merkle_t merkle1;
     cmt_merkle_t merkle2;
     char valid[] = "/tmp/tmp.XXXXXX";
@@ -180,10 +156,10 @@ void test_cmt_merkle_save_load(void) {
     assert(cmt_merkle_save(NULL, valid) == -EINVAL);
     assert(cmt_merkle_load(NULL, valid) == -EINVAL);
 
-    printf("%s passed\n", __FUNCTION__);
+    printf("test %s passed\n", __func__);
 }
 
-void test_cmt_merkle_full(void) {
+static void test_cmt_merkle_full(void) {
     const uint64_t max_count =
         (CMT_MERKLE_TREE_HEIGHT < 8 * sizeof(uint64_t)) ? (UINT64_C(1) << CMT_MERKLE_TREE_HEIGHT) : UINT64_MAX;
     cmt_merkle_t merkle = {
@@ -199,7 +175,7 @@ void test_cmt_merkle_full(void) {
 
 int main(void) {
     setenv("CMT_DEBUG", "yes", 1);
-    test_merkle_init_and_reset();
+    test_merkle_get_root_pristine();
     test_merkle_push_back_and_get_root();
     test_cmt_merkle_push_back_data_and_get_root();
     test_cmt_merkle_push_back();

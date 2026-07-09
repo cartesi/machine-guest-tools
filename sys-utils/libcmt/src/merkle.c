@@ -115,10 +115,6 @@ static void print_hash(uint8_t hash[CMT_KECCAK_LENGTH]) {
 #endif
 
 void cmt_merkle_init(cmt_merkle_t *me) {
-    cmt_merkle_reset(me);
-}
-
-void cmt_merkle_reset(cmt_merkle_t *me) {
     me->leaf_count = 0;
     memset(me->state, 0, sizeof(me->state));
 }

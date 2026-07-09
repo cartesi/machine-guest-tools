@@ -13,16 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "buf.h"
-#include "io.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include <libcmt/buf.h>
+#include <libcmt/io.h>
+
 int main(void) {
     /* init ------------------------------------------------------------- */
-    union cmt_io_driver io[1];
+    union cmt_io io[1];
     if (cmt_io_init(io)) {
         (void) fprintf(stderr, "%s:%d failed to init\n", __FILE__, __LINE__);
         return EXIT_FAILURE;

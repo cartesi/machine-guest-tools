@@ -23,7 +23,7 @@
 #define TO_STRING(X) TO_STRING_HELPER(X)
 
 // Define loop unrolling depending on the compiler
-#if defined(__clang__)
+#ifdef __clang__
 #define UNROLL_LOOP(n) _Pragma(TO_STRING(unroll(n)))
 #elif defined(__GNUC__) && !defined(__clang__)
 #define UNROLL_LOOP(n) _Pragma(TO_STRING(GCC unroll(n)))
@@ -39,7 +39,7 @@
 #define CMT_KECCAK_INIT(STATE)                                                                                         \
     {                                                                                                                  \
         .st.q = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, },                        \
-        .pt = 0, .rsiz = 200 - 2 * CMT_KECCAK_LENGTH,                                                                  \
+        .pt = 0, .rsiz = 200 - (2 * CMT_KECCAK_LENGTH),                                                                  \
     }
 
 // clang-format on
@@ -61,7 +61,7 @@ static void keccakf(uint64_t st[25]) {
 
 #if __BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__
     for (int i = 0; i < 25; i++) {
-        st[i] = __builtin_bswap64((uint64_t *) (st[i]));
+        st[i] = __builtin_bswap64(st[i]);
     }
 #endif
 

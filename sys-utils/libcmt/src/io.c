@@ -29,13 +29,13 @@
 
 #include <linux/cartesi/cmio.h>
 
-int cmt_io_init(cmt_io_driver_t *_me) {
+int cmt_io_init(cmt_io_t *_me) {
     int rc = 0;
 
     if (!_me) {
         return -EINVAL;
     }
-    cmt_io_driver_ioctl_t *me = &_me->ioctl;
+    cmt_io_ioctl_t *me = &_me->ioctl;
     me->fd = open("/dev/cmio", O_RDWR);
 
     if (me->fd < 0) {
@@ -61,8 +61,8 @@ int cmt_io_init(cmt_io_driver_t *_me) {
         goto do_unmap;
     }
 
-    cmt_buf_init(me->tx, setup.tx.length, tx);
-    cmt_buf_init(me->rx, setup.rx.length, rx);
+    *me->tx = cmt_buf_make(setup.tx.length, tx);
+    *me->rx = cmt_buf_make(setup.rx.length, rx);
     return 0;
 
 do_unmap:
@@ -72,21 +72,21 @@ do_close:
     return rc;
 }
 
-void cmt_io_fini(cmt_io_driver_t *_me) {
+void cmt_io_fini(cmt_io_t *_me) {
     if (!_me) {
         return;
     }
-    cmt_io_driver_ioctl_t *me = &_me->ioctl;
+    cmt_io_ioctl_t *me = &_me->ioctl;
 
-    munmap(me->tx->begin, cmt_buf_length(me->tx));
-    munmap(me->rx->begin, cmt_buf_length(me->rx));
+    munmap(me->tx->begin, cmt_buf_length(*me->tx));
+    munmap(me->rx->begin, cmt_buf_length(*me->rx));
     close(me->fd);
 
     memset(me, 0, sizeof(*me));
     me->fd = -1;
 }
 
-cmt_buf_t cmt_io_get_tx(cmt_io_driver_t *me) {
+cmt_buf_t cmt_io_get_tx(cmt_io_t *me) {
     const cmt_buf_t empty = {NULL, NULL};
     if (!me) {
         return empty;
@@ -94,7 +94,7 @@ cmt_buf_t cmt_io_get_tx(cmt_io_driver_t *me) {
     return *me->ioctl.tx;
 }
 
-cmt_buf_t cmt_io_get_rx(cmt_io_driver_t *me) {
+cmt_buf_t cmt_io_get_rx(cmt_io_t *me) {
     const cmt_buf_t empty = {NULL, NULL};
     if (!me) {
         return empty;
@@ -124,14 +124,14 @@ static struct cmt_io_yield unpack(uint64_t x) {
 }
 
 /* io-mock.c:cmt_io_yield emulates this behavior (go and check it does if you change it) */
-int cmt_io_yield(cmt_io_driver_t *_me, struct cmt_io_yield *rr) {
+int cmt_io_yield(cmt_io_t *_me, struct cmt_io_yield *rr) {
     if (!_me) {
         return -EINVAL;
     }
     if (!rr) {
         return -EINVAL;
     }
-    cmt_io_driver_ioctl_t *me = &_me->ioctl;
+    cmt_io_ioctl_t *me = &_me->ioctl;
 
     bool debug = cmt_util_debug_enabled();
     if (debug) {

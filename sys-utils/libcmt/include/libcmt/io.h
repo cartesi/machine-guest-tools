@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 /** @file
- * @defgroup libcmt_io_driver Cartesi Machine Input/Output Driver
+ * @defgroup libcmt_io Cartesi Machine Input/Output Driver
  * Low level abstraction of the Cartesi Machine kernel driver.
  *
  * Interaction is as follows:
@@ -91,14 +91,14 @@ typedef struct {
     cmt_buf_t tx[1];
     cmt_buf_t rx[1];
     int fd;
-} cmt_io_driver_ioctl_t;
+} cmt_io_ioctl_t;
 
 typedef struct {
     cmt_buf_t tx[1];
     cmt_buf_t rx[1];
     cmt_buf_t inputs_left;
 
-    int input_type;
+    uint16_t input_type;
     char input_filename[128];
     char input_fileext[16];
 
@@ -106,14 +106,13 @@ typedef struct {
     int output_seq;
     int report_seq;
     int exception_seq;
-    int gio_seq;
-} cmt_io_driver_mock_t;
+} cmt_io_mock_t;
 
 /** Implementation specific cmio state. */
-typedef union cmt_io_driver {
-    cmt_io_driver_ioctl_t ioctl;
-    cmt_io_driver_mock_t mock;
-} cmt_io_driver_t;
+typedef union cmt_io {
+    cmt_io_ioctl_t ioctl;
+    cmt_io_mock_t mock;
+} cmt_io_t;
 
 /** yield struct cmt_io_yield */
 typedef struct cmt_io_yield {
@@ -125,20 +124,20 @@ typedef struct cmt_io_yield {
 
 /** Open the io device and initialize the driver. Release its resources with @ref cmt_io_fini.
  *
- * @param [in] me A uninitialized @ref cmt_io_driver state
+ * @param [in] me A uninitialized @ref cmt_io state
  *
  * @return
  * |   |                             |
  * |--:|-----------------------------|
  * |  0| success                     |
  * |< 0| failure with a -errno value | */
-int cmt_io_init(cmt_io_driver_t *me);
+int cmt_io_init(cmt_io_t *me);
 
 /** Release the driver resources and close the io device.
  *
  * @param [in] me A successfully initialized state by @ref cmt_io_init
  * @note usage of @p me after this call is a BUG and will cause undefined behaviour */
-void cmt_io_fini(cmt_io_driver_t *me);
+void cmt_io_fini(cmt_io_t *me);
 
 /** Retrieve the transmit buffer @p tx
  *
@@ -146,7 +145,7 @@ void cmt_io_fini(cmt_io_driver_t *me);
  * @return
  * - writable memory region as defined in the setup structure (check @ref cmt_buf_t)
  * @note memory is valid until @ref cmt_io_fini is called. */
-cmt_buf_t cmt_io_get_tx(cmt_io_driver_t *me);
+cmt_buf_t cmt_io_get_tx(cmt_io_t *me);
 
 /** Retrieve the receive buffer @p rx
  *
@@ -154,7 +153,7 @@ cmt_buf_t cmt_io_get_tx(cmt_io_driver_t *me);
  * @return
  * - readable memory region as defined in the setup structure (check @ref cmt_buf_t)
  * @note memory is valid until @ref cmt_io_fini is called. */
-cmt_buf_t cmt_io_get_rx(cmt_io_driver_t *me);
+cmt_buf_t cmt_io_get_rx(cmt_io_t *me);
 
 /** Perform the yield encoded in @p rr.
  *
@@ -163,6 +162,6 @@ cmt_buf_t cmt_io_get_rx(cmt_io_driver_t *me);
  * @return
  * - 0 on success
  * - negative errno code on error */
-int cmt_io_yield(cmt_io_driver_t *me, cmt_io_yield_t *rr);
+int cmt_io_yield(cmt_io_t *me, cmt_io_yield_t *rr);
 
 #endif /* CMT_IO_H */

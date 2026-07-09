@@ -132,7 +132,7 @@ void parse_args(int argc, char *argv[], struct parsed_args *p) {
 
 int main(int argc, char *argv[]) {
     struct parsed_args args;
-    cmt_io_driver_t io[1];
+    cmt_io_t io[1];
 
     parse_args(argc, argv, &args);
     cmt_io_yield_t req[1] = {{

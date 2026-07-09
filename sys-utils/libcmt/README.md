@@ -1,17 +1,21 @@
 # Cartesi Machine Tools
 
-Is a C library to facilitate the development of applications running on the cartesi-machine.
-It handles the IO and communication protocol with the machine-emulator.
+Cartesi Machine Tools is a C library to facilitate the development of applications running on the Cartesi Machine.
+It handles the IO and communication protocol with the machine emulator.
 
-The high level @ref libcmt\_rollup API provides functions for common operations, such as generating vouchers, notices, retrieving the next input, etc.
+The high level @ref libcmt\_rollup API provides functions for common operations,
+such as emitting outputs (notices/vouchers), emitting reports, throwing exceptions, and retrieving the next input.
 Check the [cartesi documentation](https://docs.cartesi.io/) for an explanation of the rollup interaction model.
 
-In addition to the above mentioned module, we provide @ref libcmt\_io\_driver, a thin abstraction of the linux kernel driver.
+For lower-level control, @ref libcmt\_io provides a thin abstraction of the Linux kernel driver.
 
 And finally, a couple of utility modules used by the high level API are also exposed.
-- @ref libcmt\_abi is a Ethereum Virtual Machine Application Binary Interface (EVM-ABI) encoder / decoder.
-- @ref libcmt\_buf is a bounds checking buffer.
-- @ref libcmt\_merkle is a sparse merkle tree implementation on top of keccak.
+- @ref libcmt\_abi is an Ethereum Virtual Machine Application Binary Interface (EVM-ABI) encoder / decoder.
+- @ref libcmt\_codec provides encoding/decoding for known Solidity ABI types (EvmAdvance, Notice, CallVoucher, ERC20Transfer, ERC721Transfer, ERC1155 transfers).
+- @ref libcmt\_buf is a bounds-checking buffer.
+- @ref libcmt\_merkle is a sparse merkle tree implementation on top of Keccak.
+- @ref libcmt\_buf is a bounds-checking buffer.
+- @ref libcmt\_merkle is a sparse merkle tree implementation on top of Keccak.
 - @ref libcmt\_keccak is the hashing function used extensively by Ethereum.
 
 The header files and a compiled RISC-V version of this library can be found [here](https://github.com/cartesi/machine-guest-tools/).
@@ -19,7 +23,7 @@ We also provide `.pc` (pkg-config) files to facilitate linking.
 
 # mock and testing
 
-This library provides a mock implementation of @ref libcmt\_io\_driver that is
+This library provides a mock implementation of @ref libcmt\_io that is
 able to simulate requests and replies via files on the host machine.
 
 - Build it with: `make mock`.
@@ -59,12 +63,17 @@ The (verifiable) outputs root hash:
 advance.outputs_root_hash.bin
 ```
 
-Inputs must follow this syntax, a comma separated list of reason number followed by a file path:
+Progress updates are printed to stderr (no file is generated).
+
+Inputs must follow this syntax, a comma-separated list of reason number followed by a file path:
 ```
 CMT_INPUTS="<reason-number> ':' <filepath> ( ',' <reason-number> ':' <filepath> ) *"
 ```
 
 For rollup, available reasons are: `0` is advance and `1` is inspect.
+
+File paths must not contain commas.
+When the inputs list is exhausted, `cmt_rollup_wait_for_input` returns `-ENODATA`.
 
 In addition to @p CMT\_INPUTS, there is also the @p CMT\_DEBUG variable.
 Enabling it will cause additional debug messages to be displayed.
@@ -75,56 +84,50 @@ CMT_DEBUG=yes ./application
 
 ## generating inputs
 
-Inputs and Outputs are expected to be EVM-ABI encoded. Encoding and decoding
-can be achieved multiple ways, including writing tools with this library. A
+Advance state inputs and outputs are EVM-ABI encoded. Encoding and decoding
+can be achieved in multiple ways, including writing tools with this library. A
 simple way to generate testing data is to use the @p cast tool from
 [foundry](http://book.getfoundry.sh/reference/cast/cast.html) and `xxd`.
 
 Encoding an @p EvmAdvance:
 ```
-cast calldata "EvmAdvance(uint256,address,address,uint256,uint256,uint256,bytes)" \
+cast calldata "EvmAdvance(uint64,address,address,uint64,uint64,uint256,uint64,bytes)" \
 	0x0000000000000000000000000000000000000001 \
 	0x0000000000000000000000000000000000000002 \
 	0x0000000000000000000000000000000000000003 \
 	0x0000000000000000000000000000000000000004 \
 	0x0000000000000000000000000000000000000005 \
 	0x0000000000000000000000000000000000000006 \
+	0x0000000000000000000000000000000000000007 \
 	0x`echo "advance-0" | xxd -p -c0` | xxd -r -p > 0.bin
 ```
 
-Inspect states require no encoding.
+Inspect inputs are raw bytes (no ABI encoding required).
 ```
 echo -en "inspect-0" > 1.bin
 ```
 
 ## parsing outputs
 
-Decoding a @p Voucher:
+Outputs use direct Solidity function call encoding (see the [Output Indexing specification](https://github.com/cartesi/rollups-contracts/blob/feature/output-indexing-simpl/docs/output-indexing.md)).
+Each output includes an `app_context` field (a `bytes32`), free for applications to use as they see fit. Recipients can filter outputs by this value.
+For example, a CALL voucher is encoded as:
 ```
-cast calldata-decode "Voucher(address,uint256,bytes)" 0x`xxd -p -c0 "$1"` | (
-    read address
-    read value
-    read bytes
-
-    echo "{"
-    printf '\t"address" : "%s",\n' $address
-    printf '\t"value"   : "%s",\n' $value
-    printf '\t"bytes"   : "%s"\n' $bytes
-    echo "}"
-)
-
-# sh decode-voucher.sh $1 | jq '.bytes' | xxd -r
+CallVoucher(address,bytes32,uint256,bytes)
+  destination = <20-byte address>
+  app_context = <32-byte bytes32>
+  value       = <32-byte uint256>
+  payload     = <bytes>
 ```
 
-Decoding a @p Notice:
+Decode a CallVoucher with `cast`:
 ```
-cast calldata-decode "Notice(bytes)" 0x`xxd -p -c0 "$1"` | (
-    read bytes
-
-    echo "{"
-    printf '\t"bytes"   : "%s"\n' $bytes
-    echo "}"
-)
-
-# sh decode-notice.sh $1 | jq '.bytes' | xxd -r
+cast calldata-decode "CallVoucher(address,bytes32,uint256,bytes)" 0x`xxd -p -c0 "$1"`
 ```
+
+Decode a Notice with `cast`:
+```
+cast calldata-decode "Notice(bytes32,bytes)" 0x`xxd -p -c0 "$1"`
+```
+
+See the @ref libcmt\_codec module for the full list of supported output types (ERC20Transfer, ERC721Transfer, ERC1155SingleTransfer, ERC1155BatchTransfer). All output types include an `app_context` `bytes32` field.

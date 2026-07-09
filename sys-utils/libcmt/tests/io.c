@@ -1,4 +1,3 @@
-#include "io.h"
 #include <assert.h>
 #include <errno.h>
 #include <stdio.h>
@@ -6,7 +5,9 @@
 #include <string.h>
 #include <unistd.h>
 
-void invalid_parameters(void) {
+#include <libcmt/io.h>
+
+static void invalid_parameters(void) {
     assert(cmt_io_init(NULL) == -EINVAL);
     cmt_io_fini(NULL);
 
@@ -17,7 +18,7 @@ void invalid_parameters(void) {
     assert(rx.begin == NULL && rx.end == NULL);
 
     setenv("CMT_INPUTS", "invalid", 1);
-    cmt_io_driver_t io[1];
+    cmt_io_t io[1];
     assert(cmt_io_init(io) == 0);
 
     { // invalid cmd + reason
@@ -49,7 +50,7 @@ void invalid_parameters(void) {
     cmt_io_fini(io);
 }
 
-void file_too_large(void) {
+static void file_too_large(void) {
     // create a 4MB file (any value larger than buffer works)
     char valid[] = "/tmp/tmp.XXXXXX";
     assert(mkstemp(valid) > 0);
@@ -62,20 +63,48 @@ void file_too_large(void) {
         setenv("CMT_INPUTS", buf, 1);
     }
 
-    cmt_io_driver_t io[1];
+    cmt_io_t io[1];
     cmt_io_yield_t rr[1] = {{
         .cmd = HTIF_YIELD_CMD_MANUAL,
         .reason = HTIF_YIELD_MANUAL_REASON_RX_ACCEPTED,
     }};
     assert(cmt_io_init(io) == 0);
     assert(cmt_io_yield(io, rr) == -ENODATA);
-    cmt_io_fini(NULL);
+    cmt_io_fini(io);
 
     (void) remove(valid);
 }
 
+static void filename_no_extension(void) {
+    // create a file with no dot extension to trigger the filename-parse debug path
+    char tmpl[] = "/tmp/noextXXXXXX";
+    int fd = mkstemp(tmpl);
+    assert(fd > 0);
+    close(fd);
+
+    { // setup input
+        char buf[256];
+        (void) snprintf(buf, sizeof buf, "0:%s", tmpl);
+        setenv("CMT_DEBUG", "yes", 1);
+        setenv("CMT_INPUTS", buf, 1);
+    }
+
+    cmt_io_t io[1];
+    cmt_io_yield_t rr[1] = {{
+        .cmd = HTIF_YIELD_CMD_MANUAL,
+        .reason = HTIF_YIELD_MANUAL_REASON_RX_ACCEPTED,
+    }};
+    assert(cmt_io_init(io) == 0);
+    assert(cmt_io_yield(io, rr) == -ENODATA);
+    cmt_io_fini(io);
+
+    (void) remove(tmpl);
+}
+
 int main(void) {
+    setenv("CMT_DEBUG", "yes", 1);
     invalid_parameters();
     file_too_large();
+    filename_no_extension();
     return 0;
 }

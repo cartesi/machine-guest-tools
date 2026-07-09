@@ -43,7 +43,7 @@ else
 all: build-riscv64 ## Build all tools
 endif
 
-build-riscv64: sys-utils rollup-http package.json ## Build riscv64 tools
+build-riscv64: sys-utils package.json ## Build riscv64 tools
 
 build: targz fs ## Build targz and fs (cross compiling with Docker)
 
@@ -103,8 +103,6 @@ env: ## Print useful Makefile information
 
 test: ## Test tools using mock builds
 	make -C sys-utils/libcmt/ test
-	cd rollup-http/rollup-http-server && \
-	MOCK_BUILD=true $(CARGO) test -- --show-output --test-threads=1
 
 setup: ## Setup riscv64 buildx
 	@docker run --privileged --rm  linuxkit/binfmt:bebbae0c1100ebf7bf2ad4dfb9dfd719cf0ef132
@@ -119,7 +117,7 @@ image: ## Build tools cross compilation Docker image
 		--target tools-env -t $(TOOLS_IMAGE)-tools-env -f Dockerfile .
 
 shell: ## Spawn a cross compilation shell with tools Docker image
-	@docker run --hostname rust-builder -it --rm \
+	@docker run -it --rm \
 		-e USER=$$(id -u -n) \
 		-e GROUP=$$(id -g -n) \
 		-e UID=$$(id -u) \
@@ -135,16 +133,12 @@ libcmt: ## Compile libcmt
 sys-utils: libcmt ## Compile system utilities tools
 	@$(MAKE) -C sys-utils
 
-rollup-http: libcmt ## Compile rollup http tools
-	@$(MAKE) -C rollup-http
-
 install-share: package.json
 	install -Dm644 package.json $(DESTDIR)$(PREFIX)/share/package.json
 
 install: install-share ## Install all tools into ${DESTDIR}/${PREFIX}
 	@$(MAKE) -C sys-utils/libcmt install
 	@$(MAKE) -C sys-utils install
-	@$(MAKE) -C rollup-http install
 
 clean-image: ## Clean docker images
 	@(docker rmi $(TOOLS_IMAGE) > /dev/null 2>&1 || true)
@@ -153,7 +147,6 @@ clean: ## Clean built files
 	@rm -f $(TOOLS_TARGZ) $(TOOLS_DEB) $(TOOLS_ROOTFS_EXT2) $(TOOLS_ROOTFS_TAR)
 	@$(MAKE) -C sys-utils/libcmt clean
 	@$(MAKE) -C sys-utils clean
-	@$(MAKE) -C rollup-http clean
 
 distclean: clean clean-image ## Clean built files and docker images
 
@@ -164,4 +157,4 @@ help: ## Show this help
 		-e 's/^\(.\+\):\(.*\)/$(shell tput setaf 6)\1$(shell tput sgr0):\2/' \
 		$(MAKEFILE_LIST) | column -c2 -t -s :
 
-.PHONY: all build targz deb fs fs-license env test setup setup-required image shell libcmt sys-utils rollup-http install clean-image clean distclean help
+.PHONY: all build targz deb fs fs-license env test setup setup-required image shell libcmt sys-utils install clean-image clean distclean help

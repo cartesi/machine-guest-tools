@@ -34,27 +34,36 @@ typedef struct {
     uint8_t *end;   /**< end of memory region */
 } cmt_buf_t;
 
-/** Initialize @p me buffer backed by @p data, @p length bytes in size
+/** Make a buffer backed by @p data, @p length bytes in size
  *
- * @param [out] me     a uninitialized instance
  * @param [in]  length size in bytes of @b data
  * @param [in]  data   the backing memory to be used.
  *
- * @note @p data memory must outlive @p me.
+ * @return initialized buffer.
+ *
+ * @note @p data memory must outlive the returned buffer.
  * user must copy the contents otherwise */
-void cmt_buf_init(cmt_buf_t *me, size_t length, void *data);
+cmt_buf_t cmt_buf_make(size_t length, const void *data);
 
 /** Split a buffer in two, @b lhs with @b lhs_length bytes and @b rhs with the rest
  *
- * @param [in,out] me         initialized buffer
+ * @param [in]     me         initialized buffer
  * @param [in]     lhs_length bytes in @b lhs
- * @param [out]    lhs        left hand side
- * @param [out]    rhs        right hand side
+ * @param [out]    lhs        optional; left hand side
+ * @param [out]    rhs        optional; right hand side
  *
  * @return
  * - 0 success
  * - negative value on error. -ENOBUFS when length(me) < lhs_length. */
-int cmt_buf_split(const cmt_buf_t *me, size_t lhs_length, cmt_buf_t *lhs, cmt_buf_t *rhs);
+int cmt_buf_split(cmt_buf_t me, size_t lhs_length, cmt_buf_t *lhs, cmt_buf_t *rhs);
+
+/** Pointer to the begin of buffer
+ *
+ * @param [in] me     initialized buffer
+ *
+ * @return
+ * - pointer to begin of buffer */
+void *cmt_buf_begin(cmt_buf_t me);
 
 /** Length in bytes of @p me
  *
@@ -62,14 +71,14 @@ int cmt_buf_split(const cmt_buf_t *me, size_t lhs_length, cmt_buf_t *lhs, cmt_bu
  *
  * @return
  * - size in bytes */
-size_t cmt_buf_length(const cmt_buf_t *me);
+size_t cmt_buf_length(cmt_buf_t me);
 
 /** Print the contents of @b me buffer to stdout
  *
  * @param [in] begin          start of memory region
  * @param [in] end            end of memory region
  * @param [in] bytes_per_line bytes per line (must be a power of 2). */
-void cmt_buf_xxd(void *begin, void *end, int bytes_per_line);
+void cmt_buf_xxd(const void *begin, const void *end, int bytes_per_line);
 
 /** Take the substring @p x from @p xs start to the first @p , (comma).
  * @param [out]    x           substring

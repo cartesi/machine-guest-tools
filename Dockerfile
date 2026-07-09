@@ -36,7 +36,6 @@ apt-get install -y --no-install-recommends \
         pkg-config \
         dpkg-cross \
         adduser \
-        rustup \
         gcc-riscv64-linux-gnu \
         g++-riscv64-linux-gnu
 
@@ -45,11 +44,6 @@ apt-get install -y --no-install-recommends --allow-downgrades /tmp/linux-libc-de
 EOF
 
 ENV TOOLCHAIN_PREFIX="riscv64-linux-gnu-"
-ENV RUSTUP_HOME=/opt/rust
-ENV PATH="/opt/rust/toolchains/1.77-x86_64-unknown-linux-gnu/bin:${PATH}"
-
-# Install rust
-RUN rustup default 1.77 && rustup target add riscv64gc-unknown-linux-gnu
 
 # build
 # ------------------------------------------------------------------------------
@@ -61,7 +55,6 @@ WORKDIR /work
 # Compile
 RUN make -j$(nproc) libcmt
 RUN make -j$(nproc) sys-utils
-RUN make -j$(nproc) rollup-http
 
 # Install locally
 RUN make install DESTDIR=$(pwd)/_install PREFIX=/usr
@@ -69,8 +62,6 @@ RUN make install DESTDIR=$(pwd)/_install PREFIX=/usr
 # Strip
 RUN <<EOF
 set -e
-riscv64-linux-gnu-strip _install/usr/bin/rollup-http-server
-riscv64-linux-gnu-strip _install/usr/bin/echo-dapp
 riscv64-linux-gnu-strip _install/usr/bin/rollup
 riscv64-linux-gnu-strip _install/usr/bin/ioctl-echo-loop
 riscv64-linux-gnu-strip _install/usr/bin/yield

@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-int exception(union cmt_io_driver *io) {
+int exception(union cmt_io *io) {
     /* init ------------------------------------------------------------- */
     if (cmt_io_init(io)) {
         fprintf(stderr, "%s:%d failed to init\n", __FILE__, __LINE__);

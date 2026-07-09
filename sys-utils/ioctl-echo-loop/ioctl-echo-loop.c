@@ -23,29 +23,36 @@
 #include <unistd.h>
 
 #include "libcmt/rollup.h"
+#include "libcmt/codec.h"
 
 static void help(const char *progname) {
     fprintf(stderr,
         "Usage: %s [options]\n"
         "Where options are: \n"
-        "  --vouchers=<n>               replicate input in n vouchers (default: 0)\n"
-        "  --delegate-call-vouchers=<n> replicate input in n delegate call vouchers (default: 0)\n"
-        "  --notices=<n>                replicate input in n notices (default: 0)\n"
-        "  --reports=<n>                replicate input in n reports (default: 1)\n"
-        "  --reject=<n>                 reject the nth input (default: -1)\n"
-        "  --reject-inspects            reject all inspects\n"
-        "  --exception=<n>              cause an exception on the nth input (default: -1)\n"
-        "  --verbose=<n>                display information of structures (default: 0)\n",
+        "  --notices=<n>                    replicate input in n notices (default: 0)\n"
+        "  --call-vouchers=<n>              replicate input in n call vouchers (default: 0)\n"
+        "  --erc1155-batch-transfers=<n>    replicate input in n ERC1155 batch transfers (default: 0)\n"
+        "  --erc1155-transfers=<n>          replicate input in n ERC1155 transfers (default: 0)\n"
+        "  --erc20-transfers=<n>            replicate input in n ERC20 transfers (default: 0)\n"
+        "  --erc721-transfers=<n>           replicate input in n ERC721 transfers (default: 0)\n"
+        "  --reports=<n>                    replicate input in n reports (default: 1)\n"
+        "  --reject=<n>                     reject the nth input (default: -1)\n"
+        "  --reject-inspects                reject all inspects\n"
+        "  --exception=<n>                  cause an exception on the nth input (default: -1)\n"
+        "  --verbose=<n>                    display information of structures (default: 0)\n",
         progname);
 
     exit(1);
 }
 
 struct parsed_args {
-    unsigned voucher_count;
-    unsigned delegate_call_vouchers;
+    unsigned call_voucher_count;
     unsigned notice_count;
     unsigned report_count;
+    unsigned erc1155_batch_transfer_count;
+    unsigned erc1155_transfer_count;
+    unsigned erc20_transfer_count;
+    unsigned erc721_transfer_count;
     unsigned verbose;
     unsigned reject;
     bool reject_inspects;
@@ -75,9 +82,12 @@ static void parse_args(int argc, char *argv[], struct parsed_args *args) {
     args->exception = -1;
 
     for (i = 1; i < argc; i++) {
-        if (!parse_number(argv[i], "--vouchers=%u%n", &args->voucher_count) &&
-            !parse_number(argv[i], "--delegate-call-vouchers=%u%n", &args->delegate_call_vouchers) &&
+        if (!parse_number(argv[i], "--call-vouchers=%u%n", &args->call_voucher_count) &&
             !parse_number(argv[i], "--notices=%u%n", &args->notice_count) &&
+            !parse_number(argv[i], "--erc1155-batch-transfers=%u%n", &args->erc1155_batch_transfer_count) &&
+            !parse_number(argv[i], "--erc1155-transfers=%u%n", &args->erc1155_transfer_count) &&
+            !parse_number(argv[i], "--erc20-transfers=%u%n", &args->erc20_transfer_count) &&
+            !parse_number(argv[i], "--erc721-transfers=%u%n", &args->erc721_transfer_count) &&
             !parse_number(argv[i], "--reports=%u%n", &args->report_count) &&
             !parse_number(argv[i], "--verbose=%u%n", &args->verbose) &&
             !parse_token(argv[i], "--reject-inspects", &args->reject_inspects) &&
@@ -88,65 +98,187 @@ static void parse_args(int argc, char *argv[], struct parsed_args *args) {
     }
 }
 
-static int finish_request(cmt_rollup_t *me, cmt_rollup_finish_t *finish, bool accept) {
-    finish->accept_previous_request = accept;
-    return cmt_rollup_finish(me, finish);
-}
-
-static int write_notices(cmt_rollup_t *me, unsigned count, cmt_abi_bytes_t *payload) {
+static int write_notices(cmt_rollup_t *me, unsigned count, cmt_buf_t *payload) {
     for (unsigned i = 0; i < count; i++) {
-        int rc = cmt_rollup_emit_notice(me, payload, NULL);
-        if (rc)
-            return rc;
+        cmt_buf_t tx = cmt_io_get_tx(cmt_rollup_get_io(me));
+        cmt_buf_t out;
+        cmt_notice_args_t notice = {
+            .app_context = {.data[31] = 0xff},
+            .payload = *payload,
+        };
+        if (cmt_notice_encode(tx, &out, &notice) < 0 ||
+            cmt_rollup_emit_output(me, out) < 0) {
+            return -1;
+        }
     }
     return 0;
 }
 
-static int write_vouchers(cmt_rollup_t *me, unsigned count, cmt_abi_address_t *destination, cmt_abi_bytes_t *payload) {
+static int write_vouchers(cmt_rollup_t *me, unsigned count, cmt_abi_address_t *destination, cmt_buf_t *payload) {
     cmt_abi_u256_t value = {{
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xde, 0xad, 0xbe, 0xef,
     }};
     for (unsigned i = 0; i < count; i++) {
-        int rc = cmt_rollup_emit_voucher(me, destination, &value, payload, NULL);
-        if (rc)
-            return rc;
+        cmt_buf_t tx = cmt_io_get_tx(cmt_rollup_get_io(me));
+        cmt_buf_t out;
+        cmt_call_voucher_args_t voucher = {
+            .app_context = {.data[31] = 0xff},
+            .destination = *destination,
+            .value = value,
+            .payload = *payload,
+        };
+        if (cmt_call_voucher_encode(tx, &out, &voucher) < 0 ||
+            cmt_rollup_emit_output(me, out) < 0) {
+            return -1;
+        }
     }
     return 0;
 }
 
-static int write_delegate_call_vouchers(cmt_rollup_t *me, unsigned count, cmt_abi_address_t *destination, cmt_abi_bytes_t *payload) {
+static int write_reports(cmt_rollup_t *me, unsigned count, cmt_buf_t *payload) {
     for (unsigned i = 0; i < count; i++) {
-        int rc = cmt_rollup_emit_delegate_call_voucher(me, destination, payload, NULL);
-        if (rc)
-            return rc;
+        if (cmt_rollup_emit_report(me, *payload))
+            return -1;
     }
     return 0;
 }
 
-static int write_reports(cmt_rollup_t *me, unsigned count, cmt_abi_bytes_t *payload) {
+static int write_erc1155_batch_transfers(cmt_rollup_t *me, unsigned count, cmt_abi_address_t *recipient) {
+    static const uint8_t erc1155_batch_items_data[64] = {
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02,
+    };
+    cmt_abi_address_t token = {{
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x02,
+    }};
+    cmt_buf_t items = cmt_buf_make(64, erc1155_batch_items_data);
     for (unsigned i = 0; i < count; i++) {
-        int rc = cmt_rollup_emit_report(me, payload);
-        if (rc)
-            return rc;
+        cmt_buf_t tx = cmt_io_get_tx(cmt_rollup_get_io(me));
+        cmt_buf_t out;
+        cmt_erc1155_batch_transfer_args_t transfer = {
+            .app_context = {.data[31] = 0xff},
+            .recipient = *recipient,
+            .token = token,
+            .items = items,
+        };
+        if (cmt_erc1155_batch_transfer_encode(tx, &out, &transfer) < 0 ||
+            cmt_rollup_emit_output(me, out) < 0) {
+            return -1;
+        }
     }
     return 0;
 }
 
-static int handle_advance_state_request(cmt_rollup_t *me, struct parsed_args *args, uint64_t *index) {
-    cmt_rollup_advance_t advance;
-    int rc = cmt_rollup_read_advance_state(me, &advance);
-    if (rc)
-        return rc;
-    *index = advance.index;
-    fprintf(stderr, "advance with index %d\n", (int) advance.index);
-    if (write_vouchers(me, args->voucher_count, &advance.msg_sender, &advance.payload) != 0) {
+static int write_erc1155_transfers(cmt_rollup_t *me, unsigned count, cmt_abi_address_t *recipient) {
+    cmt_abi_address_t token = {{
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x02,
+    }};
+    cmt_abi_u256_t token_id = {{
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+    }};
+    cmt_abi_u256_t value = {{
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02,
+    }};
+    for (unsigned i = 0; i < count; i++) {
+        cmt_buf_t tx = cmt_io_get_tx(cmt_rollup_get_io(me));
+        cmt_buf_t out;
+        cmt_erc1155_transfer_args_t transfer = {
+            .app_context = {.data[31] = 0xff},
+            .recipient = *recipient,
+            .token = token,
+            .token_id = token_id,
+            .value = value,
+        };
+        if (cmt_erc1155_transfer_encode(tx, &out, &transfer) < 0 ||
+            cmt_rollup_emit_output(me, out) < 0) {
+            return -1;
+        }
+    }
+    return 0;
+}
+
+static int write_erc20_transfers(cmt_rollup_t *me, unsigned count, cmt_abi_address_t *recipient) {
+    cmt_abi_address_t token = {{
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x02,
+    }};
+    cmt_abi_u256_t value = {{
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03,
+    }};
+    for (unsigned i = 0; i < count; i++) {
+        cmt_buf_t tx = cmt_io_get_tx(cmt_rollup_get_io(me));
+        cmt_buf_t out;
+        cmt_erc20_transfer_args_t transfer = {
+            .app_context = {.data[31] = 0xff},
+            .recipient = *recipient,
+            .token = token,
+            .value = value,
+        };
+        if (cmt_erc20_transfer_encode(tx, &out, &transfer) < 0 ||
+            cmt_rollup_emit_output(me, out) < 0) {
+            return -1;
+        }
+    }
+    return 0;
+}
+
+static int write_erc721_transfers(cmt_rollup_t *me, unsigned count, cmt_abi_address_t *recipient) {
+    cmt_abi_address_t token = {{
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x02,
+    }};
+    cmt_abi_u256_t token_id = {{
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04,
+    }};
+    for (unsigned i = 0; i < count; i++) {
+        cmt_buf_t tx = cmt_io_get_tx(cmt_rollup_get_io(me));
+        cmt_buf_t out;
+        cmt_erc721_transfer_args_t transfer = {
+            .app_context = {.data[31] = 0xff},
+            .recipient = *recipient,
+            .token = token,
+            .token_id = token_id,
+        };
+        if (cmt_erc721_transfer_encode(tx, &out, &transfer) < 0 ||
+            cmt_rollup_emit_output(me, out) < 0) {
+            return -1;
+        }
+    }
+    return 0;
+}
+
+static int handle_advance_state_request(cmt_rollup_t *me, cmt_buf_t rx, struct parsed_args *args, uint64_t *index) {
+    cmt_evm_advance_args_t advance;
+    if (cmt_evm_advance_decode(rx, &advance) < 0) {
         return -1;
     }
-    if (write_delegate_call_vouchers(me, args->delegate_call_vouchers, &advance.msg_sender, &advance.payload) != 0) {
+    *index = advance.index;
+    fprintf(stderr, "advance with index %d\n", (int) advance.index);
+    if (write_vouchers(me, args->call_voucher_count, &advance.msg_sender, &advance.payload) != 0) {
         return -1;
     }
     if (write_notices(me, args->notice_count, &advance.payload) != 0) {
+        return -1;
+    }
+    if (write_erc1155_batch_transfers(me, args->erc1155_batch_transfer_count, &advance.msg_sender) != 0) {
+        return -1;
+    }
+    if (write_erc1155_transfers(me, args->erc1155_transfer_count, &advance.msg_sender) != 0) {
+        return -1;
+    }
+    if (write_erc20_transfers(me, args->erc20_transfer_count, &advance.msg_sender) != 0) {
+        return -1;
+    }
+    if (write_erc721_transfers(me, args->erc721_transfer_count, &advance.msg_sender) != 0) {
         return -1;
     }
     if (write_reports(me, args->report_count, &advance.payload) != 0) {
@@ -155,27 +287,22 @@ static int handle_advance_state_request(cmt_rollup_t *me, struct parsed_args *ar
     return 0;
 }
 
-static int handle_inspect_state_request(cmt_rollup_t *me, struct parsed_args *args) {
-    cmt_rollup_inspect_t inspect;
-    int rc = cmt_rollup_read_inspect_state(me, &inspect);
-    if (rc)
-        return rc;
-
-    if (write_reports(me, args->report_count, &inspect.payload) != 0) {
+static int handle_inspect_state_request(cmt_rollup_t *me, cmt_buf_t *rx, struct parsed_args *args) {
+    if (write_reports(me, args->report_count, rx) != 0) {
         return -1;
     }
     return 0;
 }
 
-static int handle_request(cmt_rollup_t *me, struct parsed_args *args, cmt_rollup_finish_t *finish, uint64_t *index) {
-    switch (finish->next_request_type) {
+static int handle_request(cmt_rollup_t *me, cmt_rollup_req_type_t req_type, cmt_buf_t rx, struct parsed_args *args, uint64_t *index) {
+    switch (req_type) {
         case HTIF_YIELD_REASON_ADVANCE:
-            return handle_advance_state_request(me, args, index);
+            return handle_advance_state_request(me, rx, args, index);
         case HTIF_YIELD_REASON_INSPECT:
-            return handle_inspect_state_request(me, args);
+            return handle_inspect_state_request(me, &rx, args);
         default:
             /* unknown request type */
-            fprintf(stderr, "Unknown request type %d\n", finish->next_request_type);
+            fprintf(stderr, "Unknown request type %d\n", req_type);
             return -1;
     }
     return 0;
@@ -184,40 +311,39 @@ static int handle_request(cmt_rollup_t *me, struct parsed_args *args, cmt_rollup
 int main(int argc, char *argv[]) {
     cmt_rollup_t rollup;
     uint64_t advance_index = 0;
+    cmt_buf_t rx;
 
-    if (cmt_rollup_init(&rollup))
+    if (cmt_rollup_init(&rollup, NULL))
         return EXIT_FAILURE;
 
     struct parsed_args args;
     parse_args(argc, argv, &args);
 
-    fprintf(stderr, "Echoing as %d voucher copies, %d notice copies, and %d report copies\n", args.voucher_count,
+    fprintf(stderr, "Echoing as %d voucher copies, %d notice copies, and %d report copies\n", args.call_voucher_count,
         args.notice_count, args.report_count);
 
-    /* Accept the initial request */
-    cmt_rollup_finish_t finish;
-    if (finish_request(&rollup, &finish, true) != 0) {
+    long req_type = cmt_rollup_wait_for_input(&rollup, true, &rx);
+    if (req_type < 0) {
         exit(1);
     }
 
-    /* handle a request, then wait for next */
     for (;;) {
-        bool reject_advance, reject_inspect, throw_exception;
-        if (handle_request(&rollup, &args, &finish, &advance_index) != 0) {
+        if (handle_request(&rollup, req_type, rx, &args, &advance_index) != 0) {
             break;
         }
-        reject_advance = (finish.next_request_type == HTIF_YIELD_REASON_ADVANCE) && (args.reject == advance_index);
-        reject_inspect = (finish.next_request_type == HTIF_YIELD_REASON_INSPECT) && args.reject_inspects;
-        throw_exception = (finish.next_request_type == HTIF_YIELD_REASON_ADVANCE) && (args.exception == advance_index);
+
+        bool reject_advance = (req_type == CMT_ROLLUP_REQ_TYPE_ADVANCE) && (args.reject == advance_index);
+        bool reject_inspect = (req_type == CMT_ROLLUP_REQ_TYPE_INSPECT) && args.reject_inspects;
+        bool throw_exception = (req_type == CMT_ROLLUP_REQ_TYPE_ADVANCE) && (args.exception == advance_index);
+
         if (throw_exception) {
-            char message[] = "exception";
-            const cmt_abi_bytes_t payload = {
-                .data = message,
-                .length = sizeof message - 1,
-            };
-            cmt_rollup_emit_exception(&rollup, &payload);
+            char msg[] = "exception";
+            cmt_buf_t data = cmt_buf_make(sizeof(msg) - 1, msg);
+            cmt_rollup_emit_exception(&rollup, data);
         }
-        if (finish_request(&rollup, &finish, !(reject_advance || reject_inspect)) != 0) {
+
+        req_type = cmt_rollup_wait_for_input(&rollup, !(reject_advance || reject_inspect), &rx);
+        if (req_type < 0) {
             break;
         }
     }

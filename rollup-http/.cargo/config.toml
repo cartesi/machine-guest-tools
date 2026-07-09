@@ -1,5 +1,0 @@
-[target.riscv64gc-unknown-linux-gnu]
-linker = "riscv64-linux-gnu-gcc"
-
-[net]
-git-fetch-with-cli = true
