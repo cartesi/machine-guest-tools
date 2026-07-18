@@ -19,6 +19,7 @@
 #include <iterator>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <errno.h>
 
 #include <fcntl.h>
@@ -30,6 +31,7 @@ extern "C" {
 #include "libcmt/rollup.h"
 };
 
+#include "base64.hpp"
 #include "json.hpp"
 
 // RAII file descriptor implementation
@@ -58,45 +60,53 @@ private:
 static void print_help(void) {
     std::cerr <<
         R"(Usage:
-    rollup [command]
+    rollup [options] [command]
+
+  where [options] can be
+
+    --hex-payload
+      encode/decode <data> fields in JSON values as "0x"-prefixed hex (default)
+
+    --base64-payload
+      encode/decode <data> fields in JSON values as base64
 
   where [command] is one of
 
     voucher
       emit a voucher read from stdin as a JSON object in the format
-        {"destination": <address>, "value": <hex-uint256>, "payload": <hex-data>}
+        {"destination": <address>, "value": <hex-uint256>, "payload": <data>}
       where
         <address> contains a 20-byte EVM address in hex,
         <hex-uint256> contains a big-endian 32-byte unsigned integer in hex, and
-        <hex-data> contains arbitrary data in hex
+        <data> contains arbitrary data in the selected payload encoding
       if successful, prints to stdout a JSON object in the format
         {"index": <number> }
       where field "index" is the index allocated for the voucher
 
     delegate-call-voucher
       emit a delegate call voucher read from stdin as a JSON object in the format
-        {"destination": <address>, "payload": <hex-data>}
+        {"destination": <address>, "payload": <data>}
       where
         <address> contains a 20-byte EVM address in hex,
-        <hex-data> contains arbitrary data in hex
+        <data> contains arbitrary data in the selected payload encoding
       if successful, prints to stdout a JSON object in the format
         {"index": <number> }
       where field "index" is the index allocated for the voucher
 
     notice
       emit a notice read from stdin as a JSON object in the format
-        {"payload": <hex-data> }
+        {"payload": <data> }
       where
-        <hex-data> contains arbitrary data in hex
+        <data> contains arbitrary data in the selected payload encoding
       if successful, prints to stdout a JSON object in the format
         {"index": <number> }
       where field "index" is the index allocated for the notice
 
     report
       emit a report read from stdin as a JSON object in the format
-        {"payload": <hex-data> }
+        {"payload": <data> }
       where
-        <hex-data> contains arbitrary data in hex
+        <data> contains arbitrary data in the selected payload encoding
 
     finish
       accept or reject the previous request based on a JSON object
@@ -117,18 +127,18 @@ static void print_help(void) {
           "block_timestamp": <number>
           "prev_randao": <hex-uint256>,
           "index": <number>,
-          "payload": <hex-data>
+          "payload": <data>
         },
       where
         <address> contains a 20-byte EVM address in hex,
         <hex-uint256> contains a big-endian 32-byte unsigned integer in hex, and
-        <hex-data> contains arbitrary data in hex
+        <data> contains arbitrary data in the selected payload encoding
 
       when field "request_type" contains "inspect_state",
       field "data" contains a JSON object in the format
-        {"payload": <hex-data> }
+        {"payload": <data> }
       where
-        <hex-data> contains arbitrary data in hex
+        <data> contains arbitrary data in the selected payload encoding
 
     accept
       a shortcut for finish with implied input
@@ -142,18 +152,18 @@ static void print_help(void) {
 
     exception
       throw an exception read from stdin as a JSON object in the format
-        {"payload": <hex-data> }
+        {"payload": <data> }
       where
-        <hex-data> contains arbitrary data in hex
+        <data> contains arbitrary data in the selected payload encoding
 
     gio
       performs a generic IO operation request based on a JSON object
       read from stdin in the format
-        { "domain": <number>, "id": <hex-data> }
+        { "domain": <number>, "id": <data> }
       if successful, prints to stdout a JSON object in the format
-        { "code": <number>, "data": <hex-data> }
+        { "code": <number>, "data": <data> }
       where
-        <hex-data> contains arbitrary data in hex
+        <data> contains arbitrary data in the selected payload encoding
 
 )";
 }
@@ -224,11 +234,32 @@ static std::string hex(const uint8_t *data, uint64_t length) {
     return ss.str();
 }
 
+// Encoding used for arbitrary-length data fields in JSON values
+enum class encoding { hex, base64 };
+
+static encoding payload_encoding = encoding::hex;
+
+// Convert a payload string in the selected encoding into the corresponding bytes
+static std::string decode_payload(const std::string &s) {
+    if (payload_encoding == encoding::base64) {
+        return cartesi::decode_base64(s);
+    }
+    return unhex(s);
+}
+
+// Convert binary payload data into a string in the selected encoding
+static std::string encode_payload(const uint8_t *data, uint64_t length) {
+    if (payload_encoding == encoding::base64) {
+        return cartesi::encode_base64(std::string_view(reinterpret_cast<const char *>(data), length));
+    }
+    return hex(data, length);
+}
+
 // Read input for voucher data, issue voucher, write result to output
 static int write_voucher(void) try {
     rollup r;
     auto ji = nlohmann::json::parse(read_input());
-    auto payload_bytes = unhex(ji["payload"].get<std::string>());
+    auto payload_bytes = decode_payload(ji["payload"].get<std::string>());
     auto destination_bytes = unhex20(ji["destination"].get<std::string>());
     auto value_bytes = unhex32(ji["value"].get<std::string>());
     uint64_t index = 0;
@@ -258,7 +289,7 @@ static int write_voucher(void) try {
 static int write_delegate_call_voucher(void) try {
     rollup r;
     auto ji = nlohmann::json::parse(read_input());
-    auto payload_bytes = unhex(ji["payload"].get<std::string>());
+    auto payload_bytes = decode_payload(ji["payload"].get<std::string>());
     auto destination_bytes = unhex20(ji["destination"].get<std::string>());
     uint64_t index = 0;
     cmt_abi_address_t destination;
@@ -285,7 +316,7 @@ static int write_delegate_call_voucher(void) try {
 static int write_notice(void) try {
     rollup r;
     auto ji = nlohmann::json::parse(read_input());
-    auto payload_bytes = unhex(ji["payload"].get<std::string>());
+    auto payload_bytes = decode_payload(ji["payload"].get<std::string>());
     cmt_abi_bytes_t payload;
     payload.data = reinterpret_cast<unsigned char *>(payload_bytes.data());
     payload.length = payload_bytes.size();
@@ -308,7 +339,7 @@ static int write_notice(void) try {
 static int write_report(void) try {
     rollup r;
     auto ji = nlohmann::json::parse(read_input());
-    auto payload_bytes = unhex(ji["payload"].get<std::string>());
+    auto payload_bytes = decode_payload(ji["payload"].get<std::string>());
     cmt_abi_bytes_t payload;
     payload.data = reinterpret_cast<unsigned char *>(payload_bytes.data());
     payload.length = payload_bytes.size();
@@ -322,7 +353,7 @@ static int write_report(void) try {
 static int throw_exception(void) try {
     rollup r;
     auto ji = nlohmann::json::parse(read_input());
-    auto payload_bytes = unhex(ji["payload"].get<std::string>());
+    auto payload_bytes = decode_payload(ji["payload"].get<std::string>());
     cmt_abi_bytes_t payload;
     payload.data = reinterpret_cast<unsigned char *>(payload_bytes.data());
     payload.length = payload_bytes.size();
@@ -352,7 +383,7 @@ static int write_advance_state(rollup &r, const cmt_rollup_finish_t *f) {
                 {"block_timestamp", advance.block_timestamp},
                 {"prev_randao", hex(advance.prev_randao.data, std::size(advance.prev_randao.data))},
                 {"index", advance.index},
-                {"payload", hex(reinterpret_cast<const uint8_t *>(advance.payload.data), advance.payload.length)},
+                {"payload", encode_payload(reinterpret_cast<const uint8_t *>(advance.payload.data), advance.payload.length)},
             }}};
     std::cout << j.dump(2) << '\n';
     return 0;
@@ -371,7 +402,7 @@ static int write_inspect_state(rollup &r, const cmt_rollup_finish_t *f) {
     nlohmann::json j = {{"request_type", "inspect_state"},
         {"data",
             {
-                {"payload", hex(reinterpret_cast<const uint8_t *>(inspect.payload.data), inspect.payload.length)},
+                {"payload", encode_payload(reinterpret_cast<const uint8_t *>(inspect.payload.data), inspect.payload.length)},
             }}};
     std::cout << j.dump(2) << '\n';
     return 0;
@@ -426,7 +457,7 @@ static int finish_request(void) try {
 static int gio(void) try {
     rollup r;
     auto ji = nlohmann::json::parse(read_input());
-    auto id = unhex(ji["id"].get<std::string>());
+    auto id = decode_payload(ji["id"].get<std::string>());
     auto domain = ji["domain"].get<uint16_t>();
 
     cmt_gio req{.domain = domain,
@@ -442,7 +473,7 @@ static int gio(void) try {
 
     nlohmann::json j = {
         {"code", req.response_code},
-        {"data", hex(reinterpret_cast<const uint8_t *>(req.response_data), req.response_data_length)},
+        {"data", encode_payload(reinterpret_cast<const uint8_t *>(req.response_data), req.response_data_length)},
     };
     std::cout << j.dump(2) << '\n';
 
@@ -455,11 +486,25 @@ static int gio(void) try {
 
 // Figure out command and run it
 int main(int argc, char *argv[]) {
-    if (argc < 2) {
+    int i = 1;
+    for (; i < argc; ++i) {
+        if (strcmp(argv[i], "--hex-payload") == 0) {
+            payload_encoding = encoding::hex;
+        } else if (strcmp(argv[i], "--base64-payload") == 0) {
+            payload_encoding = encoding::base64;
+        } else {
+            break;
+        }
+    }
+    if (i >= argc) {
         print_help();
         exit(1);
     }
-    const char *command = argv[1];
+    const char *command = argv[i];
+    if (i + 1 < argc) {
+        std::cerr << "Unexpected argument '" << argv[i + 1] << "'\n\n";
+        return 1;
+    }
     if (strcmp(command, "voucher") == 0) {
         return write_voucher();
     } else if (strcmp(command, "delegate-call-voucher") == 0) {

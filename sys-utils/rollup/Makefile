@@ -16,13 +16,13 @@
 
 PREFIX   ?= /usr
 CXX      := $(TOOLCHAIN_PREFIX)g++
-CXXFLAGS += -Wall -Wextra -pedantic -O2 -std=c++20 -I../libcmt/include -Ithird-party/nlohmann-json
+CXXFLAGS += -Wall -Wextra -pedantic -O2 -std=c++20 -I../libcmt/include -Ithird-party/nlohmann-json -Ithird-party/base64
 LDFLAGS  += -L../libcmt/build/riscv64 -l:libcmt.a
 
 all: rollup
 
-rollup: rollup.cpp
-	$(CXX) $(CXXFLAGS) -o $@ $< $(LDFLAGS)
+rollup: rollup.cpp third-party/base64/base64.cpp
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 
 install: rollup
 	install -Dm755 rollup $(DESTDIR)$(PREFIX)/bin/rollup
