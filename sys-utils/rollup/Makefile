@@ -16,7 +16,7 @@
 
 PREFIX   ?= /usr
 CXX      := $(TOOLCHAIN_PREFIX)g++
-CXXFLAGS += -Wall -Wextra -pedantic -O2 -std=c++20 -I../libcmt/include
+CXXFLAGS += -Wall -Wextra -pedantic -O2 -std=c++20 -I../libcmt/include -Ithird-party/nlohmann-json
 LDFLAGS  += -L../libcmt/build/riscv64 -l:libcmt.a
 
 all: rollup
