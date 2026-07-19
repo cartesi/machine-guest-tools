@@ -16,15 +16,26 @@
 
 PREFIX   ?= /usr
 CXX      := $(TOOLCHAIN_PREFIX)g++
-CXXFLAGS += -Wall -Wextra -pedantic -O2 -std=c++20
+CXXFLAGS += -Wall -Wextra -pedantic -O2 -std=c++23 -I../third-party/cartesi
+HEX_SRC  := ../third-party/cartesi/hex.cpp
+HEX_HDRS := ../third-party/cartesi/hex.hpp ../third-party/cartesi/concepts.hpp
 
 all: hex
 
-hex: hex.cpp
-	$(CXX) $(CFLAGS) -o $@ $< $(LDFLAGS)
+hex: hex.cpp $(HEX_SRC) $(HEX_HDRS)
+	$(CXX) $(CXXFLAGS) -o $@ hex.cpp $(HEX_SRC) $(LDFLAGS)
+
+hex-test: hex-test.cpp $(HEX_SRC) $(HEX_HDRS)
+	$(CXX) $(CXXFLAGS) -o $@ hex-test.cpp $(HEX_SRC) $(LDFLAGS)
+
+test: hex hex-test
+	./hex-test
+	./test.sh
 
 install: hex
 	install -Dm755 hex $(DESTDIR)$(PREFIX)/bin/hex
 
 clean:
-	@rm -f hex
+	@rm -f hex hex-test
+
+.PHONY: all test install clean

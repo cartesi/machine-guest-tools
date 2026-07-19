@@ -104,6 +104,8 @@ env: ## Print useful Makefile information
 	@echo LINUX_HEADERS_SHA256=$(LINUX_HEADERS_SHA256)
 
 test: ## Test tools using mock builds
+	$(MAKE) -C sys-utils/hex test
+	$(MAKE) -C sys-utils/rollup test
 	make -C sys-utils/libcmt/ test
 	cd rollup-http/rollup-http-server && \
 	MOCK_BUILD=true $(CARGO) test -- --show-output --test-threads=1

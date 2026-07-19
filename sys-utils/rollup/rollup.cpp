@@ -17,7 +17,6 @@
 #include <cstdint>
 #include <iostream>
 #include <iterator>
-#include <sstream>
 #include <string>
 #include <string_view>
 #include <errno.h>
@@ -32,6 +31,7 @@ extern "C" {
 };
 
 #include "base64.hpp"
+#include "hex.hpp"
 #include "json.hpp"
 
 // RAII file descriptor implementation
@@ -177,64 +177,18 @@ static std::string read_input(void) {
     return std::string(begin, end);
 }
 
-// Convert a hex character into its corresponding nibble {0..15}
-static uint8_t hexnibble(char a) {
-    if (a >= 'a' && a <= 'f') {
-        return a - 'a' + 10;
-    }
-    if (a >= 'A' && a <= 'F') {
-        return a - 'A' + 10;
-    }
-    if (a >= '0' && a <= '9') {
-        return a - '0';
-    }
-    throw std::invalid_argument{"invalid hex character"};
-    return 0;
-}
-
-// Convert two hex character into its corresponding byte {0..255}
-static uint8_t hexbyte(char a, char b) {
-    return hexnibble(a) << 4 | hexnibble(b);
-}
-
-// Convert an hex string into the corresponding bytes
-static std::string unhex(const std::string &s) {
-    if (s.find_first_not_of("abcdefABCDEF0123456789", 2) != std::string::npos) {
-        throw std::invalid_argument{"invalid character in address"};
-    }
-    std::string res;
-    res.reserve(20 + 1);
-    for (unsigned i = 2; i < s.size(); i += 2) {
-        res.push_back(hexbyte(s[i], s[i + 1]));
-    }
-    return res;
-}
-
-static std::string unhex20(const std::string &s) {
+static std::string decode_hex20(const std::string &s) {
     if (s.size() != 2 + 40) {
         throw std::invalid_argument{"incorrect address size"};
     }
-    return unhex(s);
+    return cartesi::decode_hex(s);
 }
 
-static std::string unhex32(const std::string &s) {
+static std::string decode_hex32(const std::string &s) {
     if (s.size() > 2 + 64) {
         throw std::invalid_argument{"incorrect value size"};
     }
-    return unhex(s);
-}
-
-// Convert binary data into hex string
-static std::string hex(const uint8_t *data, uint64_t length) {
-    static const char t[] = "0123456789abcdef";
-    std::stringstream ss;
-    ss << "0x";
-    for (uint64_t i = 0; i < length; ++i) {
-        char hi = t[(data[i] >> 4) & 0x0f];
-        char lo = t[(data[i] >> 0) & 0x0f];
-        ss << std::hex << hi << lo;
-    }
-    return ss.str();
+    return cartesi::decode_hex(s);
 }
 
 // Encoding used for arbitrary-length data fields in JSON values
@@ -249,7 +203,7 @@ static std::string decode_payload(const std::string &s) {
     } else if (payload_encoding == encoding::utf8) {
         return s;
     }
-    return unhex(s);
+    return cartesi::decode_hex(s);
 }
 
 // Convert binary payload data into a string in the selected encoding
@@ -259,7 +213,7 @@ static std::string encode_payload(const uint8_t *data, uint64_t length) {
     } else if (payload_encoding == encoding::utf8) {
         return {reinterpret_cast<const char *>(data), static_cast<size_t>(length)};
     }
-    return hex(data, length);
+    return cartesi::encode_hex(std::string_view(reinterpret_cast<const char *>(data), length));
 }
 
 // Read input for voucher data, issue voucher, write result to output
@@ -267,8 +221,8 @@ static int write_voucher(void) try {
     rollup r;
     auto ji = nlohmann::json::parse(read_input());
     auto payload_bytes = decode_payload(ji["payload"].get<std::string>());
-    auto destination_bytes = unhex20(ji["destination"].get<std::string>());
-    auto value_bytes = unhex32(ji["value"].get<std::string>());
+    auto destination_bytes = decode_hex20(ji["destination"].get<std::string>());
+    auto value_bytes = decode_hex32(ji["value"].get<std::string>());
     uint64_t index = 0;
     cmt_abi_address_t destination;
     cmt_abi_u256_t value;
@@ -297,7 +251,7 @@ static int write_delegate_call_voucher(void) try {
     rollup r;
     auto ji = nlohmann::json::parse(read_input());
     auto payload_bytes = decode_payload(ji["payload"].get<std::string>());
-    auto destination_bytes = unhex20(ji["destination"].get<std::string>());
+    auto destination_bytes = decode_hex20(ji["destination"].get<std::string>());
     uint64_t index = 0;
     cmt_abi_address_t destination;
     cmt_abi_bytes_t payload;
@@ -384,11 +338,11 @@ static int write_advance_state(rollup &r, const cmt_rollup_finish_t *f) {
         {"data",
             {
                 {"chain_id", advance.chain_id},
-                {"app_contract", hex(advance.app_contract.data, std::size(advance.app_contract.data))},
-                {"msg_sender", hex(advance.msg_sender.data, std::size(advance.msg_sender.data))},
+                {"app_contract", cartesi::encode_hex(advance.app_contract.data)},
+                {"msg_sender", cartesi::encode_hex(advance.msg_sender.data)},
                 {"block_number", advance.block_number},
                 {"block_timestamp", advance.block_timestamp},
-                {"prev_randao", hex(advance.prev_randao.data, std::size(advance.prev_randao.data))},
+                {"prev_randao", cartesi::encode_hex(advance.prev_randao.data)},
                 {"index", advance.index},
                 {"payload", encode_payload(reinterpret_cast<const uint8_t *>(advance.payload.data), advance.payload.length)},
             }}};

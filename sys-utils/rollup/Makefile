@@ -16,16 +16,29 @@
 
 PREFIX   ?= /usr
 CXX      := $(TOOLCHAIN_PREFIX)g++
-CXXFLAGS += -Wall -Wextra -pedantic -O2 -std=c++20 -I../libcmt/include -Ithird-party/nlohmann-json -Ithird-party/base64
+CXXFLAGS += -Wall -Wextra -pedantic -O2 -std=c++23 -I../libcmt/include -I../third-party/cartesi \
+	-Ithird-party/nlohmann-json
 LDFLAGS  += -L../libcmt/build/riscv64 -l:libcmt.a
+BASE64_SRC  := ../third-party/cartesi/base64.cpp
+BASE64_HDRS := ../third-party/cartesi/base64.hpp
+HEX_SRC  := ../third-party/cartesi/hex.cpp
+HEX_HDRS := ../third-party/cartesi/hex.hpp ../third-party/cartesi/concepts.hpp
 
 all: rollup
 
-rollup: rollup.cpp third-party/base64/base64.cpp
-	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
+rollup: rollup.cpp $(BASE64_SRC) $(BASE64_HDRS) $(HEX_SRC) $(HEX_HDRS)
+	$(CXX) $(CXXFLAGS) -o $@ rollup.cpp $(BASE64_SRC) $(HEX_SRC) $(LDFLAGS)
+
+base64-test: base64-test.cpp $(BASE64_SRC) $(BASE64_HDRS) ../third-party/cartesi/concepts.hpp
+	$(CXX) $(CXXFLAGS) -o $@ base64-test.cpp $(BASE64_SRC)
+
+test: base64-test
+	./base64-test
 
 install: rollup
 	install -Dm755 rollup $(DESTDIR)$(PREFIX)/bin/rollup
 
 clean:
-	@rm -f rollup
+	@rm -f rollup base64-test
+
+.PHONY: all test install clean
