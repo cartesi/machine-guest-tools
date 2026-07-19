@@ -70,6 +70,9 @@ static void print_help(void) {
     --base64-payload
       encode/decode <data> fields in JSON values as base64
 
+    --utf8-payload
+      encode/decode <data> fields in JSON values as UTF-8 text
+
   where [command] is one of
 
     voucher
@@ -235,7 +238,7 @@ static std::string hex(const uint8_t *data, uint64_t length) {
 }
 
 // Encoding used for arbitrary-length data fields in JSON values
-enum class encoding { hex, base64 };
+enum class encoding { hex, base64, utf8 };
 
 static encoding payload_encoding = encoding::hex;
 
@@ -243,6 +246,8 @@ static encoding payload_encoding = encoding::hex;
 static std::string decode_payload(const std::string &s) {
     if (payload_encoding == encoding::base64) {
         return cartesi::decode_base64(s);
+    } else if (payload_encoding == encoding::utf8) {
+        return s;
     }
     return unhex(s);
 }
@@ -251,6 +256,8 @@ static std::string decode_payload(const std::string &s) {
 static std::string encode_payload(const uint8_t *data, uint64_t length) {
     if (payload_encoding == encoding::base64) {
         return cartesi::encode_base64(std::string_view(reinterpret_cast<const char *>(data), length));
+    } else if (payload_encoding == encoding::utf8) {
+        return {reinterpret_cast<const char *>(data), static_cast<size_t>(length)};
     }
     return hex(data, length);
 }
@@ -492,6 +499,8 @@ int main(int argc, char *argv[]) {
             payload_encoding = encoding::hex;
         } else if (strcmp(argv[i], "--base64-payload") == 0) {
             payload_encoding = encoding::base64;
+        } else if (strcmp(argv[i], "--utf8-payload") == 0) {
+            payload_encoding = encoding::utf8;
         } else {
             break;
         }
