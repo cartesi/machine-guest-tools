@@ -54,9 +54,9 @@ The first exception will generate the file:
 advance.exception-0.bin
 ```
 
-The (verifiable) outputs root hash:
+The (verifiable) outputs Merkle root:
 ```
-advance.outputs_root_hash.bin
+advance.outputs_merkle_root.bin
 ```
 
 Inputs must follow this syntax, a comma separated list of reason number followed by a file path:

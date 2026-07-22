@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- Renamed the file suffix written by the libcmt mock for the outputs Merkle root from `.outputs_root_hash` to `.outputs_merkle_root`, aligning with the terminology used in the rest of the project
 
 ## [0.17.2] - 2025-10-21
 ### Changed

@@ -217,7 +217,7 @@ void test_rollup_outputs_reports_and_exceptions(void) {
     printf("%s passed\n", __FUNCTION__);
 }
 
-void test_rollup_root_hash_pristine(void) {
+void test_rollup_outputs_merkle_root_pristine(void) {
     cmt_rollup_t rollup;
     cmt_rollup_finish_t finish;
 

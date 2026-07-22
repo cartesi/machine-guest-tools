@@ -180,7 +180,7 @@ static int mock_rx_accepted(cmt_io_driver_mock_t *me, struct cmt_io_yield *rr) {
     if (me->input_seq++) { // skip the first
         char filepath[128 + 32 + 8 + 16];
         // NOLINTNEXTLINE(cert-err33-c, clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling)
-        snprintf(filepath, sizeof filepath, "%s.outputs_root_hash%s", me->input_filename, me->input_fileext);
+        snprintf(filepath, sizeof filepath, "%s.outputs_merkle_root%s", me->input_filename, me->input_fileext);
         int rc = store_output(me, filepath, rr);
         if (rc) {
             return rc;
