@@ -5,8 +5,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.18.0] - 2026-08-03
+### Added
+- Added `memoryrange` tool, also installed as `flashdrive` and `nvram`, to look up memory ranges by label
+- Added `readmmap` and `writemmap` tools to read and write memory ranges via `mmap`
+- Added `--base64-payload` and `--utf8-payload` options to rollup tool
+- Added bundled `cmio.h`, allowing libcmt to compile without kernel headers
+- Added hex and base64 codec tests
+
 ### Changed
-- Renamed the file suffix written by the libcmt mock for the outputs Merkle root from `.outputs_root_hash` to `.outputs_merkle_root`, aligning with the terminology used in the rest of the project
+- Renamed outputs root hash to outputs Merkle root in libcmt
+- Renamed `HTIF_YIELD_REASON_ADVANCE` and `HTIF_YIELD_REASON_INSPECT` constants
+- Look up memory range labels via device tree aliases
+- Consolidated hex and base64 codecs shared by the rollup and hex tools
+- Reject unexpected extra arguments in rollup tool
+- Compile rollup and hex tools with C++23
+- Bumped nlohmann JSON to 3.12.0
+- Bumped kernel to 6.5.13-ctsi-2, which enables UIO support
+- Improved CI caching and ran the license scanner natively
+
+### Removed
+- Removed `flashdrive` script, replaced by `memoryrange` tool
+- Removed unimplemented `cmt_abi_start_frame` declaration
+
+### Fixed
+- Fixed rollup tool resetting the outputs Merkle tree on accept
+- Fixed hex tool failing on partial reads and accepting invalid hex digits
+- Fixed generation of `ffi.h`
 
 ## [0.17.2] - 2025-10-21
 ### Changed
@@ -209,7 +235,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [0.2.0]
 - [0.1.0]
 
-[Unreleased]: https://github.com/cartesi/machine-guest-tools/compare/v0.17.2...HEAD
+[Unreleased]: https://github.com/cartesi/machine-guest-tools/compare/v0.18.0...HEAD
+[0.18.0]: https://github.com/cartesi/machine-guest-tools/releases/tag/v0.18.0
 [0.17.2]: https://github.com/cartesi/machine-guest-tools/releases/tag/v0.17.2
 [0.17.1]: https://github.com/cartesi/machine-guest-tools/releases/tag/v0.17.1
 [0.17.0]: https://github.com/cartesi/machine-guest-tools/releases/tag/v0.17.0

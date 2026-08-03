@@ -17,7 +17,7 @@
 MAJOR := 0
 MINOR := 18
 PATCH := 0
-LABEL := test-1
+LABEL :=
 VERSION := $(MAJOR).$(MINOR).$(PATCH)$(LABEL)
 
 TOOLS_TARGZ := machine-guest-tools_riscv64.tar.gz
