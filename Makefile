@@ -27,11 +27,11 @@ TOOLS_ROOTFS_TAR := rootfs-tools.tar
 TOOLS_ROOTFS_EXT2 := rootfs-tools.ext2
 TOOLS_ROOTFS_IMAGE := cartesi/rootfs-tools:$(VERSION)
 
-LINUX_IMAGE_TAG ?= v0.21.0-test1
+LINUX_IMAGE_TAG ?= v0.21.0
 LINUX_IMAGE_VERSION ?= v0.21.0
-LINUX_VERSION ?= 6.5.13-ctsi-2-uio-test1
+LINUX_VERSION ?= 6.5.13-ctsi-2
 LINUX_HEADERS_URLPATH := https://github.com/cartesi/machine-linux-image/releases/download/${LINUX_IMAGE_TAG}/linux-libc-dev-riscv64-cross-${LINUX_VERSION}-${LINUX_IMAGE_VERSION}.deb
-LINUX_HEADERS_SHA256 := 879ed9f8d88b248fde1dd4715f4060cef888720df14d829f8d64d81bdf71a35d
+LINUX_HEADERS_SHA256 := 3e10f582349fdd0877f595f00659e95c01fd0af837294f05901363927781bc65
 
 PREFIX ?= /usr
 DESTDIR ?= .
