@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Changed
 - Renamed the file suffix written by the libcmt mock for the outputs Merkle root from `.outputs_root_hash` to `.outputs_merkle_root`, aligning with the terminology used in the rest of the project
+- Updated kernel headers to v6.18.38-ctsi-1, taken from the cartesi/linux headers tarball instead of the machine-linux-image linux-libc-dev deb
 
 ## [0.17.2] - 2025-10-21
 ### Changed

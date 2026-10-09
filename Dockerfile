@@ -17,9 +17,9 @@
 FROM ubuntu:24.04 AS tools-env
 
 # Install dependencies
-ARG LINUX_HEADERS_URLPATH=
+ARG LINUX_HEADERS_URL=
 ARG LINUX_HEADERS_SHA256=
-ADD ${LINUX_HEADERS_URLPATH} /tmp/linux-libc-dev-riscv64-cross.deb
+ADD ${LINUX_HEADERS_URL} /tmp/linux-headers.tar.xz
 RUN <<EOF
 set -e
 export DEBIAN_FRONTEND=noninteractive
@@ -38,10 +38,12 @@ apt-get install -y --no-install-recommends \
         adduser \
         rustup \
         gcc-riscv64-linux-gnu \
-        g++-riscv64-linux-gnu
+        g++-riscv64-linux-gnu \
+        xz-utils
 
-echo "${LINUX_HEADERS_SHA256}  /tmp/linux-libc-dev-riscv64-cross.deb" | sha256sum --check
-apt-get install -y --no-install-recommends --allow-downgrades /tmp/linux-libc-dev-riscv64-cross.deb
+echo "${LINUX_HEADERS_SHA256}  /tmp/linux-headers.tar.xz" | sha256sum --check
+tar -xJf /tmp/linux-headers.tar.xz -C /usr/riscv64-linux-gnu --no-same-owner
+rm /tmp/linux-headers.tar.xz
 EOF
 
 ENV TOOLCHAIN_PREFIX="riscv64-linux-gnu-"

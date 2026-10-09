@@ -72,7 +72,7 @@ jobs:
           build-args: |
             TOOLS_TARGZ=${{ env.TOOLS_TARGZ }}
             TOOLS_DEB=${{ env.TOOLS_DEB }}
-            LINUX_HEADERS_URLPATH=${{ env.LINUX_HEADERS_URLPATH }}
+            LINUX_HEADERS_URL=${{ env.LINUX_HEADERS_URL }}
             LINUX_HEADERS_SHA256=${{ env.LINUX_HEADERS_SHA256 }}
           cache-from: type=registry,ref=ghcr.io/cartesi/machine-guest-tools:buildcache
           cache-to: type=registry,ref=ghcr.io/cartesi/machine-guest-tools:buildcache,mode=max,image-manifest=true,oci-mediatypes=true

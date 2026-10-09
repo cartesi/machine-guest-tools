@@ -27,11 +27,10 @@ TOOLS_ROOTFS_TAR := rootfs-tools.tar
 TOOLS_ROOTFS_EXT2 := rootfs-tools.ext2
 TOOLS_ROOTFS_IMAGE := cartesi/rootfs-tools:$(VERSION)
 
-LINUX_IMAGE_TAG ?= v0.21.0-test1
-LINUX_IMAGE_VERSION ?= v0.21.0
-LINUX_VERSION ?= 6.5.13-ctsi-2-uio-test1
-LINUX_HEADERS_URLPATH := https://github.com/cartesi/machine-linux-image/releases/download/${LINUX_IMAGE_TAG}/linux-libc-dev-riscv64-cross-${LINUX_VERSION}-${LINUX_IMAGE_VERSION}.deb
-LINUX_HEADERS_SHA256 := 879ed9f8d88b248fde1dd4715f4060cef888720df14d829f8d64d81bdf71a35d
+DEPENDENCIES_LOCK ?= dependencies.lock
+include $(DEPENDENCIES_LOCK)
+
+LINUX_HEADERS_URL := https://github.com/cartesi/linux/releases/download/${LINUX_TAG}/linux-headers-${LINUX_VERSION}.tar.xz
 
 PREFIX ?= /usr
 DESTDIR ?= .
@@ -52,7 +51,7 @@ $(TOOLS_DEB) $(TOOLS_TARGZ) targz deb: ## Build tools .tar.gz and .deb (cross co
 	@docker buildx build --load \
 		--build-arg TOOLS_TARGZ=$(TOOLS_TARGZ) \
 		--build-arg TOOLS_DEB=$(TOOLS_DEB) \
-		--build-arg LINUX_HEADERS_URLPATH=$(LINUX_HEADERS_URLPATH) \
+		--build-arg LINUX_HEADERS_URL=$(LINUX_HEADERS_URL) \
 		--build-arg LINUX_HEADERS_SHA256=$(LINUX_HEADERS_SHA256) \
 		-t $(TOOLS_IMAGE) \
 		-f Dockerfile \
@@ -97,10 +96,9 @@ env: ## Print useful Makefile information
 	@echo TOOLS_ROOTFS_EXT2=$(TOOLS_ROOTFS_EXT2)
 	@echo TOOLS_IMAGE=$(TOOLS_IMAGE)
 	@echo TOOLS_ROOTFS_IMAGE=$(TOOLS_ROOTFS_IMAGE)
-	@echo LINUX_IMAGE_TAG=$(LINUX_IMAGE_TAG)
-	@echo LINUX_IMAGE_VERSION=$(LINUX_IMAGE_VERSION)
+	@echo LINUX_TAG=$(LINUX_TAG)
 	@echo LINUX_VERSION=$(LINUX_VERSION)
-	@echo LINUX_HEADERS_URLPATH=$(LINUX_HEADERS_URLPATH)
+	@echo LINUX_HEADERS_URL=$(LINUX_HEADERS_URL)
 	@echo LINUX_HEADERS_SHA256=$(LINUX_HEADERS_SHA256)
 
 test: ## Test tools using mock builds
@@ -118,7 +116,7 @@ setup-required: ## Check if riscv64 buildx setup is required
 
 image: ## Build tools cross compilation Docker image
 	docker build \
-		--build-arg LINUX_HEADERS_URLPATH=$(LINUX_HEADERS_URLPATH) \
+		--build-arg LINUX_HEADERS_URL=$(LINUX_HEADERS_URL) \
 		--build-arg LINUX_HEADERS_SHA256=$(LINUX_HEADERS_SHA256) \
 		--target tools-env -t $(TOOLS_IMAGE)-tools-env -f Dockerfile .
 

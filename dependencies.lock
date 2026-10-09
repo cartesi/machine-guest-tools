@@ -1,0 +1,7 @@
+# External artifacts used by the build.
+# Values are literal release tags and SHA-256 checksums. Make command-line
+# assignments override these defaults.
+
+LINUX_TAG?=v6.18.38-ctsi-1-test3
+LINUX_VERSION?=6.18.38-ctsi-1
+LINUX_HEADERS_SHA256?=d007525997d0af666b76849e5715eda6a0c63ac3873c16e473752272e70194c0
