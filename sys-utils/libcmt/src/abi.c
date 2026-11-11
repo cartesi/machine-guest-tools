@@ -293,6 +293,9 @@ int cmt_abi_peek_bytes_d(const cmt_buf_t *start, cmt_buf_t of[1], cmt_buf_t *byt
     if (rc) {
         return rc;
     }
+    if (offset > cmt_buf_length(start)) {
+        return -ENOBUFS;
+    }
 
     /* from the beginning, after funsel */
     cmt_buf_t it[1] = {{start->begin + offset, start->end}};

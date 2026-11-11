@@ -42,13 +42,13 @@ int cmt_buf_split(const cmt_buf_t *me, size_t lhs_length, cmt_buf_t *lhs, cmt_bu
         return -EINVAL;
     }
 
+    if (lhs_length > cmt_buf_length(me)) {
+        return -ENOBUFS;
+    }
+
     uint8_t *begin = me->begin;
     uint8_t *split = me->begin + lhs_length;
     uint8_t *end = me->end;
-
-    if (split < begin || end < split) {
-        return -ENOBUFS;
-    }
 
     lhs->begin = begin;
     lhs->end = split;
