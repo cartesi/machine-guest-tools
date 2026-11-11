@@ -262,10 +262,13 @@ int cmt_abi_get_uint256(cmt_buf_t *me, cmt_abi_u256_t *value) {
 }
 
 int cmt_abi_get_bool(cmt_buf_t *me, bool *value) {
-    bool boolean = 0;
+    uint8_t boolean = 0;
     int rc = cmt_abi_get_uint(me, sizeof(boolean), &boolean);
     if (rc) {
         return rc;
+    }
+    if (boolean > 1) {
+        return -EDOM;
     }
     *value = boolean;
     return 0;

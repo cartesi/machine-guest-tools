@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Fixed
 - Fixed libcmt `cmt_abi_get_bytes_d` and `cmt_abi_peek_bytes_d` accepting offsets outside the buffer
+- Fixed libcmt `cmt_abi_get_bool` accepting values other than 0 and 1
 
 ## [0.18.0] - 2026-08-03
 ### Added
