@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.1] - 2026-11-13
+### Fixed
+- Fixed libcmt `cmt_abi_get_bytes_d` and `cmt_abi_peek_bytes_d` accepting offsets outside the buffer
+- Fixed libcmt `cmt_abi_get_bool` accepting values other than 0 and 1
+
 ## [0.18.0] - 2026-08-03
 ### Added
 - Added `memoryrange` tool, also installed as `flashdrive` and `nvram`, to look up memory ranges by label
@@ -235,7 +240,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [0.2.0]
 - [0.1.0]
 
-[Unreleased]: https://github.com/cartesi/machine-guest-tools/compare/v0.18.0...HEAD
+[Unreleased]: https://github.com/cartesi/machine-guest-tools/compare/v0.18.1...HEAD
+[0.18.1]: https://github.com/cartesi/machine-guest-tools/releases/tag/v0.18.1
 [0.18.0]: https://github.com/cartesi/machine-guest-tools/releases/tag/v0.18.0
 [0.17.2]: https://github.com/cartesi/machine-guest-tools/releases/tag/v0.17.2
 [0.17.1]: https://github.com/cartesi/machine-guest-tools/releases/tag/v0.17.1

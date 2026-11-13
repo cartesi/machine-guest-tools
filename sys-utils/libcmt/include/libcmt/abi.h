@@ -414,10 +414,11 @@ int cmt_abi_get_uint_be(cmt_buf_t *me, size_t n, void *data);
  * @param [out]    value boolean value
  *
  * @return
- * |        |                        |
- * |-------:|------------------------|
- * |       0| success                |
- * |-ENOBUFS| no space left in @p me |
+ * |        |                          |
+ * |-------:|--------------------------|
+ * |       0| success                  |
+ * |-ENOBUFS| no space left in @p me   |
+ * |   -EDOM| value is neither 0 nor 1 |
  *
  * @code
  * ...
